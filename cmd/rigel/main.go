@@ -1,15 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/llm"
+	"github.com/mizzy/rigel/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -59,47 +60,17 @@ review, and improve code through natural language interactions.`,
 
 			fmt.Print(response)
 		} else {
-			runInteractiveMode(cmd, provider)
+			runTUIMode(cmd, provider)
 		}
 	},
 }
 
-func runInteractiveMode(cmd *cobra.Command, provider llm.Provider) {
-	fmt.Println("Welcome to Rigel interactive mode!")
-	fmt.Println("Type 'exit' or 'quit' to end the session")
-	fmt.Println()
+func runTUIMode(cmd *cobra.Command, provider llm.Provider) {
+	model := tui.NewSimpleModel(provider)
+	p := tea.NewProgram(model, tea.WithAltScreen())
 
-	scanner := bufio.NewScanner(os.Stdin)
-
-	for {
-		fmt.Print("> ")
-		if !scanner.Scan() {
-			break
-		}
-
-		input := strings.TrimSpace(scanner.Text())
-
-		if input == "" {
-			continue
-		}
-
-		if input == "exit" || input == "quit" {
-			fmt.Println("Goodbye!")
-			break
-		}
-
-		response, err := provider.Generate(cmd.Context(), input)
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			continue
-		}
-
-		fmt.Println(response)
-		fmt.Println()
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.Printf("Error reading input: %v", err)
+	if _, err := p.Run(); err != nil {
+		log.Fatalf("Error running TUI: %v", err)
 	}
 }
 
