@@ -335,11 +335,3 @@ type aiResponse struct {
 	content string
 	err     error
 }
-
-// NewSimpleModel is an alias for NewChatModel for backward compatibility
-func NewSimpleModel(provider llm.Provider) *ChatModel {
-	return NewChatModel(provider)
-}
-
-// SimpleModel is an alias for ChatModel for backward compatibility
-type SimpleModel = ChatModel

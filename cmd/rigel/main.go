@@ -75,7 +75,7 @@ review, and improve code through natural language interactions.`,
 }
 
 func runChatMode(provider llm.Provider) {
-	model := tui.NewSimpleModel(provider)
+	model := tui.NewChatModel(provider)
 	p := tea.NewProgram(model)
 
 	if _, err := p.Run(); err != nil {
