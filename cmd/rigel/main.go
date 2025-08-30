@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/mizzy/rigel/internal/analyzer"
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/llm"
 	"github.com/mizzy/rigel/internal/tui"
@@ -43,7 +42,7 @@ review, and improve code through natural language interactions.`,
 		// Check if input is piped
 		stat, _ := os.Stdin.Stat()
 		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			// Handle piped input
+			// Handle piped input - no interactive commands in pipe mode
 			input, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				log.Fatalf("Failed to read from stdin: %v", err)
@@ -54,61 +53,20 @@ review, and improve code through natural language interactions.`,
 				log.Fatal("No input provided")
 			}
 
-			// Handle commands
-			switch prompt {
-			case "/init":
-				analyzer := analyzer.NewRepoAnalyzer(provider)
-				content, err := analyzer.Analyze()
-				if err != nil {
-					log.Fatalf("Failed to analyze repository: %v", err)
-				}
-
-				err = analyzer.WriteAgentsFile(content)
-				if err != nil {
-					log.Fatalf("Failed to write AGENTS.md: %v", err)
-				}
-
-				fmt.Println("✅ Repository analyzed successfully! AGENTS.md has been created.")
-				fmt.Println("\nThe file contains:")
-				fmt.Println("• Repository structure and overview")
-				fmt.Println("• Key components and their responsibilities")
-				fmt.Println("• File purposes and dependencies")
-				fmt.Println("• Testing and configuration information")
-				return
-
-			case "/help":
-				fmt.Println("Available commands:")
-				fmt.Println()
-				fmt.Println("  /init  - Analyze repository and generate AGENTS.md")
-				fmt.Println("  /help  - Show available commands")
-				fmt.Println("  /clear - Clear chat history (interactive mode only)")
-				fmt.Println("  /exit  - Exit the application")
-				fmt.Println()
-				fmt.Println("Keyboard shortcuts (interactive mode):")
-				fmt.Println("  Tab       - Complete command")
-				fmt.Println("  ↑/↓       - Navigate suggestions")
-				fmt.Println("  Enter     - Send message or select suggestion")
-				fmt.Println("  Alt+Enter - New line")
-				fmt.Println("  Ctrl+C    - Exit")
-				return
-
-			case "/exit":
-				fmt.Println("Goodbye!")
-				return
-
-			default:
-				if strings.HasPrefix(prompt, "/") {
-					fmt.Printf("Unknown command: %s. Type /help for available commands.\n", prompt)
-					return
-				}
-
-				response, err := provider.Generate(cmd.Context(), prompt)
-				if err != nil {
-					log.Fatalf("Failed to generate response: %v", err)
-				}
-
-				fmt.Print(response)
+			// In pipe mode, slash commands are not supported
+			if strings.HasPrefix(prompt, "/") {
+				fmt.Fprintf(os.Stderr, "Slash commands like %s are only available in interactive mode.\n", prompt)
+				fmt.Fprintf(os.Stderr, "Run 'rigel' without piping input to use interactive mode.\n")
+				os.Exit(1)
 			}
+
+			// Generate response for the prompt
+			response, err := provider.Generate(cmd.Context(), prompt)
+			if err != nil {
+				log.Fatalf("Failed to generate response: %v", err)
+			}
+
+			fmt.Print(response)
 		} else {
 			// Run interactive chat mode (inline, no alternate screen)
 			runChatMode(provider)
