@@ -31,6 +31,13 @@ type ChatModel struct {
 	showSuggestions    bool
 	ctrlCPressed       bool
 	infoMessage        string
+
+	// Model selection mode
+	modelSelectionMode bool
+	availableModels    []llm.Model
+	filteredModels     []llm.Model
+	selectedModelIndex int
+	modelFilter        string
 }
 
 // Exchange represents a single chat exchange
@@ -102,6 +109,11 @@ func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Handle model selection mode
+		if m.modelSelectionMode {
+			return m.handleModelSelectionKey(msg)
+		}
+
 		// Handle special keys first
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -218,6 +230,23 @@ func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
+	case modelSelectorMsg:
+		if msg.err != nil {
+			return m, func() tea.Msg {
+				return aiResponse{err: msg.err}
+			}
+		}
+
+		m.modelSelectionMode = true
+		m.availableModels = msg.models
+		m.filteredModels = msg.models
+		m.selectedModelIndex = 0
+		m.modelFilter = ""
+		m.input.SetValue("")
+		m.input.Placeholder = "Type to filter models, Enter to select, Esc to cancel"
+
+		return m, nil
+
 	case aiResponse:
 		m.thinking = false
 
@@ -247,6 +276,84 @@ func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func (m *ChatModel) handleModelSelectionKey(msg tea.KeyMsg) (*ChatModel, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		m.exitModelSelection()
+		return m, nil
+
+	case tea.KeyEnter:
+		if len(m.filteredModels) > 0 && m.selectedModelIndex < len(m.filteredModels) {
+			selectedModel := m.filteredModels[m.selectedModelIndex]
+			m.exitModelSelection()
+			return m, m.switchModel(selectedModel.Name)
+		}
+		return m, nil
+
+	case tea.KeyUp:
+		if m.selectedModelIndex > 0 {
+			m.selectedModelIndex--
+		}
+		return m, nil
+
+	case tea.KeyDown:
+		if m.selectedModelIndex < len(m.filteredModels)-1 {
+			m.selectedModelIndex++
+		}
+		return m, nil
+
+	default:
+		var cmd tea.Cmd
+		m.input, cmd = m.input.Update(msg)
+
+		newFilter := m.input.Value()
+		if newFilter != m.modelFilter {
+			m.modelFilter = newFilter
+			m.filterModels()
+			m.selectedModelIndex = 0
+		}
+
+		return m, cmd
+	}
+}
+
+func (m *ChatModel) exitModelSelection() {
+	m.modelSelectionMode = false
+	m.input.SetValue("")
+	m.input.Placeholder = "Type a message or / for commands (Alt+Enter for new line)"
+	m.modelFilter = ""
+	m.filteredModels = nil
+	m.availableModels = nil
+	m.selectedModelIndex = 0
+}
+
+func (m *ChatModel) filterModels() {
+	if m.modelFilter == "" {
+		m.filteredModels = m.availableModels
+		return
+	}
+
+	filter := strings.ToLower(m.modelFilter)
+	m.filteredModels = nil
+
+	for _, model := range m.availableModels {
+		if strings.Contains(strings.ToLower(model.Name), filter) {
+			m.filteredModels = append(m.filteredModels, model)
+		}
+	}
+}
+
+func (m *ChatModel) switchModel(modelName string) tea.Cmd {
+	// Actually switch the model
+	m.provider.SetModel(modelName)
+
+	return func() tea.Msg {
+		return aiResponse{
+			content: fmt.Sprintf("Switched to model: %s", modelName),
+		}
+	}
+}
+
 // View renders the chat interface
 func (m ChatModel) View() string {
 	if m.quitting {
@@ -266,6 +373,49 @@ func (m ChatModel) View() string {
 		// Assistant response
 		s.WriteString(outputStyle.Render(ex.Response))
 		s.WriteString("\n\n")
+	}
+
+	// Display model selection interface if in model selection mode
+	if m.modelSelectionMode {
+		s.WriteString("\nModel Selection\n\n")
+		s.WriteString(fmt.Sprintf("Current: %s\n\n", currentModelStyle.Render(m.provider.GetCurrentModel())))
+
+		if len(m.filteredModels) == 0 {
+			s.WriteString("No models match your filter.\n")
+		} else {
+			s.WriteString("Available models:\n")
+			for i, model := range m.filteredModels {
+				prefix := "  "
+				isSelected := i == m.selectedModelIndex
+				isCurrent := model.Name == m.provider.GetCurrentModel()
+
+				modelDisplay := model.Name
+				if model.Details.ParameterSize != "" {
+					modelDisplay += fmt.Sprintf(" (%s)", model.Details.ParameterSize)
+				}
+
+				// Apply styles based on state
+				if isCurrent {
+					// Current model gets blue bold style
+					modelDisplay = currentModelStyle.Render(modelDisplay)
+					if isSelected {
+						prefix = currentModelStyle.Render("❯ ")
+					}
+				} else if isSelected {
+					// Selected (cursor) model gets yellow style
+					modelDisplay = selectedModelStyle.Render(modelDisplay)
+					prefix = selectedModelStyle.Render("❯ ")
+				}
+
+				s.WriteString(fmt.Sprintf("%s%s\n", prefix, modelDisplay))
+			}
+		}
+
+		s.WriteString("\nFilter: ")
+		s.WriteString(m.input.View())
+		s.WriteString("\n\nUse up/down arrows to navigate, Enter to select, Esc to cancel")
+
+		return s.String()
 	}
 
 	// Display current prompt if thinking

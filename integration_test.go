@@ -225,3 +225,18 @@ func (m *MockLLMProvider) Stream(ctx context.Context, prompt string) (<-chan llm
 	}()
 	return ch, nil
 }
+
+func (m *MockLLMProvider) ListModels(ctx context.Context) ([]llm.Model, error) {
+	return []llm.Model{
+		{Name: "test-model-1"},
+		{Name: "test-model-2"},
+	}, nil
+}
+
+func (m *MockLLMProvider) GetCurrentModel() string {
+	return "test-model-1"
+}
+
+func (m *MockLLMProvider) SetModel(model string) {
+	// Mock implementation - no-op
+}

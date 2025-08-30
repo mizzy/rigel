@@ -121,3 +121,21 @@ func (p *AnthropicProvider) Stream(ctx context.Context, prompt string) (<-chan S
 
 	return ch, nil
 }
+
+func (p *AnthropicProvider) ListModels(ctx context.Context) ([]Model, error) {
+	return []Model{
+		{Name: "claude-3-5-sonnet-20241022", Details: ModelDetails{Family: "claude-3-5"}},
+		{Name: "claude-3-5-haiku-20241022", Details: ModelDetails{Family: "claude-3-5"}},
+		{Name: "claude-3-opus-20240229", Details: ModelDetails{Family: "claude-3"}},
+		{Name: "claude-3-sonnet-20240229", Details: ModelDetails{Family: "claude-3"}},
+		{Name: "claude-3-haiku-20240307", Details: ModelDetails{Family: "claude-3"}},
+	}, nil
+}
+
+func (p *AnthropicProvider) GetCurrentModel() string {
+	return p.model
+}
+
+func (p *AnthropicProvider) SetModel(model string) {
+	p.model = model
+}
