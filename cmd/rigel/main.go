@@ -42,7 +42,7 @@ review, and improve code through natural language interactions.`,
 		// Check if input is piped
 		stat, _ := os.Stdin.Stat()
 		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			// Handle piped input
+			// Handle piped input - no interactive commands in pipe mode
 			input, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				log.Fatalf("Failed to read from stdin: %v", err)
@@ -53,6 +53,14 @@ review, and improve code through natural language interactions.`,
 				log.Fatal("No input provided")
 			}
 
+			// In pipe mode, slash commands are not supported
+			if strings.HasPrefix(prompt, "/") {
+				fmt.Fprintf(os.Stderr, "Slash commands like %s are only available in interactive mode.\n", prompt)
+				fmt.Fprintf(os.Stderr, "Run 'rigel' without piping input to use interactive mode.\n")
+				os.Exit(1)
+			}
+
+			// Generate response for the prompt
 			response, err := provider.Generate(cmd.Context(), prompt)
 			if err != nil {
 				log.Fatalf("Failed to generate response: %v", err)
@@ -67,7 +75,7 @@ review, and improve code through natural language interactions.`,
 }
 
 func runChatMode(provider llm.Provider) {
-	model := tui.NewSimpleModel(provider)
+	model := tui.NewChatModel(provider)
 	p := tea.NewProgram(model)
 
 	if _, err := p.Run(); err != nil {

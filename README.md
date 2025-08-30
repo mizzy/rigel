@@ -4,14 +4,14 @@ A Go-based AI coding assistant that helps developers write, review, and improve 
 
 ## Features
 
-- 💬 **AI Chat Assistant**: Powered by multiple LLM providers (Anthropic, OpenAI, Ollama)
+- 💬 **AI Chat Assistant**: Powered by multiple LLM providers (Anthropic, Ollama)
 - 🔍 **Repository Analysis**: Automatic codebase analysis with `/init` command
 - 📄 **AGENTS.md Generation**: Creates AI-friendly documentation of your codebase
 - 🖥️ **Code Generation**: Generate code from natural language descriptions
-- 💡 **Syntax Highlighting**: Beautiful code rendering with syntax colors
 - 🎨 **Clean Interface**: Simple, distraction-free chat interface
-- 📝 **Multiline Support**: Natural code and text input
-- 🌙 **Tokyo Night Theme**: Modern dark theme for comfortable viewing
+- 📝 **Multiline Support**: Natural code and text input with Alt+Enter
+- ✨ **Command Autocomplete**: Tab completion for slash commands
+- 🎯 **Rigel Theme**: Blue-white star themed interface
 
 ## Requirements
 
@@ -67,14 +67,14 @@ ollama serve
 Create a `.env` file to use different providers or models:
 
 ```bash
-# Choose a provider: ollama, anthropic, openai, google, azure
+# Choose a provider: ollama, anthropic
 PROVIDER=anthropic
 
 # AI Model API Keys (required based on provider)
-OPENAI_API_KEY=your_openai_api_key
 ANTHROPIC_API_KEY=your_anthropic_api_key
-GOOGLE_API_KEY=your_google_api_key
-AZURE_OPENAI_API_KEY=your_azure_api_key
+# OPENAI_API_KEY=your_openai_api_key        # Coming soon
+# GOOGLE_API_KEY=your_google_api_key        # Coming soon
+# AZURE_OPENAI_API_KEY=your_azure_api_key   # Coming soon
 
 # Custom model (optional, defaults based on provider)
 MODEL=claude-3-5-sonnet-20241022
@@ -101,44 +101,39 @@ rigel
 
 - 💬 **Simple Chat Interface**: Clean, distraction-free chat with AI
 - 🔍 **Repository Analysis**: Use `/init` to analyze your codebase and generate AGENTS.md
-- 💡 **Syntax Highlighting**: Beautiful code rendering with syntax colors
-- 📝 **Multiline Input**: Natural code and text input
-- 🎨 **Tokyo Night Theme**: Modern dark theme for comfortable viewing
+- 📝 **Multiline Input**: Natural code and text input with Alt+Enter
+- ✨ **Command Autocomplete**: Tab completion and navigation for slash commands
+- 🎯 **Rigel Theme**: Blue-white star themed interface
 
 #### Commands
 
 | Command/Shortcut | Action |
 |-----------------|--------|
 | `/init` | Analyze repository and generate AGENTS.md |
-| `Ctrl+Enter` | Send message |
-| `Ctrl+I` | Quick /init command |
-| `Ctrl+L` | Clear chat |
-| `Ctrl+H` or `?` | Show help |
-| `Ctrl+C` or `Ctrl+Q` | Quit |
+| `/help` | Show available commands |
+| `/clear` | Clear chat history |
+| `/exit` or `/quit` | Exit the application |
+| `Enter` | Send message |
+| `Alt+Enter` | New line |
+| `Tab` | Complete command |
+| `↑/↓` | Navigate suggestions |
+| `Ctrl+C` (twice) | Exit |
 
 #### Example Session
 
 ```
-═══════════════════════════════════════════════════════════════════
-                    🤖 Rigel AI Assistant
-═══════════════════════════════════════════════════════════════════
+✦ /init
 
-assistant 12:34
-Welcome to Rigel! Type your message or use /init to analyze the repository.
-
-user 12:35
-/init
-
-assistant 12:35
-🔍 Analyzing repository structure...
-
-assistant 12:36
 ✅ Repository analyzed successfully! AGENTS.md has been created.
 
-user 12:36
-How do I read a file in Go?
+The file contains:
+• Repository structure and overview
+• Key components and their responsibilities
+• File purposes and dependencies
+• Testing and configuration information
 
-assistant 12:36
+✦ How do I read a file in Go?
+
 To read a file in Go, you have several options. Here's the most common approach:
 
 ```go
@@ -152,10 +147,7 @@ func readFile(path string) ([]byte, error) {
 }
 ```
 
-───────────────────────────────────────────────────────────────────
-Type your message or /init to analyze repository... (Ctrl+Enter to send)
-───────────────────────────────────────────────────────────────────
-/init: Analyze repo | Ctrl+Enter: Send | Ctrl+L: Clear | Ctrl+C: Quit | ?: Help
+✦ █ Type a message or / for commands (Alt+Enter for new line)
 ```
 
 ### Non-Interactive Mode
@@ -183,17 +175,16 @@ rigel/
 ├── cmd/
 │   └── rigel/         # CLI entry point
 ├── internal/
-│   ├── agent/         # AI agent core
+│   ├── analyzer/      # Repository analysis
 │   ├── llm/           # LLM provider integrations
+│   │   ├── anthropic.go  # Anthropic Claude integration
+│   │   └── ollama.go     # Ollama local models
 │   ├── tui/           # Terminal UI components
-│   │   ├── model.go   # Bubbletea model
-│   │   ├── components.go # UI components
-│   │   ├── theme.go   # Color themes
-│   │   └── syntax.go  # Syntax highlighting
-│   ├── tools/         # Code manipulation tools
+│   │   ├── chat.go       # Main chat model
+│   │   ├── commands.go   # Command handling
+│   │   ├── suggestions.go # Autocomplete logic
+│   │   └── styles.go     # Color scheme
 │   └── config/        # Configuration management
-├── examples/          # Example usage
-└── integration_test.go # Integration tests
 ```
 
 ## Development
@@ -242,9 +233,12 @@ docker build -t rigel:latest .
 
 ## Supported LLM Providers
 
-- **Anthropic** (Claude models)
+### Currently Supported
+- **Anthropic** (Claude models) - Full support
+- **Ollama** (Local models) - Full support
+
+### Planned
 - **OpenAI** (GPT models) - Coming soon
-- **Ollama** (Local models)
 - **Google** (Gemini models) - Coming soon
 - **Azure OpenAI** - Coming soon
 
@@ -267,18 +261,25 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## Roadmap
 
-- [x] Rich TUI interface with Bubbletea
-- [x] Syntax highlighting for code blocks
-- [x] File explorer integration
-- [x] Command palette
-- [x] Session management
-- [ ] VSCode extension
-- [ ] Web-based interface
-- [ ] Plugin system for custom tools
-- [ ] Integration with LSP servers
+### Completed
+- [x] Interactive chat interface with Bubbletea
+- [x] Repository analysis with `/init` command
+- [x] Command autocomplete with Tab
+- [x] Multiline input support
+- [x] Multiple LLM provider support (Anthropic, Ollama)
+
+### In Progress
+- [ ] Syntax highlighting for code blocks
+- [ ] Session management (save/load conversations)
+
+### Planned
+- [ ] Additional LLM providers (OpenAI, Google, Azure)
+- [ ] File operations commands (/read, /write, /edit)
 - [ ] Git integration in TUI
-- [ ] Multi-tab support
-- [ ] Custom model fine-tuning
+- [ ] Custom themes
+- [ ] Plugin system for custom tools
+- [ ] Web-based interface
+- [ ] VSCode extension
 
 ## Support
 

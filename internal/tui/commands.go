@@ -1,0 +1,97 @@
+package tui
+
+import (
+	"fmt"
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mizzy/rigel/internal/analyzer"
+)
+
+// Available commands
+var availableCommands = []struct {
+	command     string
+	description string
+}{
+	{"/init", "Analyze repository and generate AGENTS.md"},
+	{"/help", "Show available commands"},
+	{"/clear", "Clear chat history"},
+	{"/exit", "Exit the application"},
+	{"/quit", "Exit the application"},
+}
+
+// handleCommand processes commands and returns the appropriate tea.Cmd
+func (m *ChatModel) handleCommand(trimmedPrompt string) tea.Cmd {
+	switch trimmedPrompt {
+	case "/init":
+		return m.analyzeRepository()
+
+	case "/help":
+		return m.showHelp()
+
+	case "/clear":
+		m.history = []Exchange{}
+		m.thinking = false
+		return nil
+
+	case "/exit", "/quit":
+		m.quitting = true
+		return tea.Quit
+
+	default:
+		if strings.HasPrefix(trimmedPrompt, "/") {
+			m.err = fmt.Errorf("unknown command: %s, type /help for available commands", trimmedPrompt)
+			m.thinking = false
+			return nil
+		}
+		return m.requestResponse(m.currentPrompt)
+	}
+}
+
+// showHelp displays the help message
+func (m *ChatModel) showHelp() tea.Cmd {
+	return func() tea.Msg {
+		var help strings.Builder
+		help.WriteString("Available commands:\n\n")
+		for _, cmd := range availableCommands {
+			help.WriteString(fmt.Sprintf("  %s - %s\n", cmd.command, cmd.description))
+		}
+		help.WriteString("\nKeyboard shortcuts:\n")
+		help.WriteString("  Tab       - Complete command\n")
+		help.WriteString("  ↑/↓       - Navigate suggestions\n")
+		help.WriteString("  Enter     - Send message or select suggestion\n")
+		help.WriteString("  Alt+Enter - New line\n")
+		help.WriteString("  Ctrl+C    - Exit\n")
+
+		return aiResponse{
+			content: help.String(),
+		}
+	}
+}
+
+// analyzeRepository runs the repository analysis
+func (m *ChatModel) analyzeRepository() tea.Cmd {
+	return func() tea.Msg {
+		// Analyze the repository and generate AGENTS.md
+		analyzer := analyzer.NewRepoAnalyzer(m.provider)
+		content, err := analyzer.Analyze()
+		if err != nil {
+			return aiResponse{err: err}
+		}
+
+		// Write the AGENTS.md file
+		err = analyzer.WriteAgentsFile(content)
+		if err != nil {
+			return aiResponse{err: err}
+		}
+
+		return aiResponse{
+			content: "✅ Repository analyzed successfully! AGENTS.md has been created.\n\n" +
+				"The file contains:\n" +
+				"• Repository structure and overview\n" +
+				"• Key components and their responsibilities\n" +
+				"• File purposes and dependencies\n" +
+				"• Testing and configuration information",
+		}
+	}
+}
