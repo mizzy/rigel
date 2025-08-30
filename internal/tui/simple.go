@@ -6,24 +6,24 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mizzy/rigel/internal/llm"
 )
 
-// Minimalist style colors
+// Rigel-inspired color scheme (blue-white star)
 var (
-	promptSymbol   = lipgloss.NewStyle().Foreground(lipgloss.Color("35")).Render(">")
-	inputStyle     = lipgloss.NewStyle()
+	promptSymbol   = lipgloss.NewStyle().Foreground(lipgloss.Color("87")).Bold(true).Render("✦") // Light blue star symbol
+	inputStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("195"))                       // Very light blue-white
 	outputStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	thinkingStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true)
+	thinkingStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("117")).Italic(true) // Soft blue
 	errorTextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 )
 
 type SimpleModel struct {
 	provider llm.Provider
-	input    textinput.Model
+	input    textarea.Model
 	spinner  spinner.Model
 
 	history       []Exchange
@@ -39,20 +39,45 @@ type Exchange struct {
 }
 
 func NewSimpleModel(provider llm.Provider) *SimpleModel {
-	ti := textinput.New()
-	ti.Placeholder = ""
-	ti.Focus()
-	ti.CharLimit = 5000
-	ti.Width = 100
-	ti.Prompt = ""
+	ta := textarea.New()
+	ta.Placeholder = "Type your message (Alt+Enter or Ctrl+J for new line, Enter to send)"
+	ta.Focus()
+	ta.CharLimit = 5000
+	ta.SetWidth(100)
+	ta.SetHeight(3)
+	ta.ShowLineNumbers = false
+	ta.Prompt = ""                // Remove the default prompt
+	ta.EndOfBufferCharacter = ' ' // Use space instead of default character
+	ta.KeyMap.InsertNewline.SetKeys("alt+enter", "ctrl+j")
+
+	// Remove borders and styling
+	noBorder := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), false).
+		BorderForeground(lipgloss.NoColor{}).
+		Padding(0).
+		Margin(0)
+
+	ta.FocusedStyle.Base = noBorder
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	ta.FocusedStyle.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color("68")) // Dim blue
+	ta.FocusedStyle.Prompt = lipgloss.NewStyle()
+	ta.FocusedStyle.Text = lipgloss.NewStyle()
+	ta.FocusedStyle.EndOfBuffer = lipgloss.NewStyle()
+
+	ta.BlurredStyle.Base = noBorder
+	ta.BlurredStyle.CursorLine = lipgloss.NewStyle()
+	ta.BlurredStyle.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color("68")) // Dim blue
+	ta.BlurredStyle.Prompt = lipgloss.NewStyle()
+	ta.BlurredStyle.Text = lipgloss.NewStyle()
+	ta.BlurredStyle.EndOfBuffer = lipgloss.NewStyle()
 
 	s := spinner.New()
-	s.Spinner = spinner.Points
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("35"))
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("87")) // Match Rigel blue
 
 	return &SimpleModel{
 		provider: provider,
-		input:    ti,
+		input:    ta,
 		spinner:  s,
 		history:  []Exchange{},
 	}
@@ -60,7 +85,7 @@ func NewSimpleModel(provider llm.Provider) *SimpleModel {
 
 func (m SimpleModel) Init() tea.Cmd {
 	return tea.Batch(
-		textinput.Blink,
+		textarea.Blink,
 		m.spinner.Tick,
 	)
 }
@@ -76,6 +101,7 @@ func (m SimpleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Handle special keys first
 		switch msg.Type {
 		case tea.KeyCtrlC:
 			m.quitting = true
@@ -86,9 +112,11 @@ func (m SimpleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.quitting = true
 				return m, tea.Quit
 			}
+		}
 
-		case tea.KeyEnter:
-			if !m.thinking && strings.TrimSpace(m.input.Value()) != "" {
+		// Check for Enter key specifically (not Alt+Enter)
+		if msg.String() == "enter" && !m.thinking {
+			if strings.TrimSpace(m.input.Value()) != "" {
 				m.currentPrompt = m.input.Value()
 				m.input.SetValue("")
 				m.thinking = true
@@ -99,6 +127,13 @@ func (m SimpleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.spinner.Tick,
 				)
 			}
+			return m, nil
+		}
+
+		// Pass all other keys (including alt+enter and ctrl+j) to textarea
+		if !m.thinking {
+			m.input, cmd = m.input.Update(msg)
+			return m, cmd
 		}
 
 	case aiResponse:
@@ -171,7 +206,24 @@ func (m SimpleModel) View() string {
 	if !m.thinking {
 		s.WriteString(promptSymbol)
 		s.WriteString(" ")
-		s.WriteString(m.input.View())
+		// Get the value and cursor position from textarea without its styling
+		value := m.input.Value()
+		if value == "" {
+			s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("68")).Render(m.input.Placeholder))
+		} else {
+			// Add indentation for multi-line input
+			lines := strings.Split(value, "\n")
+			for i, line := range lines {
+				if i > 0 {
+					s.WriteString("\n  ") // 2 spaces to align with prompt symbol + space
+				}
+				s.WriteString(line)
+			}
+		}
+		// Add cursor
+		if m.input.Focused() {
+			s.WriteString("█")
+		}
 	}
 
 	return s.String()
