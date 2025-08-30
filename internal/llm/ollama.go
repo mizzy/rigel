@@ -40,6 +40,25 @@ type ollamaGenerateRequest struct {
 	Options ollamaOptions `json:"options,omitempty"`
 }
 
+type ollamaChatRequest struct {
+	Model    string          `json:"model"`
+	Messages []ollamaMessage `json:"messages"`
+	Stream   bool            `json:"stream"`
+	Options  ollamaOptions   `json:"options,omitempty"`
+}
+
+type ollamaMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type ollamaChatResponse struct {
+	Model     string        `json:"model"`
+	CreatedAt string        `json:"created_at"`
+	Message   ollamaMessage `json:"message"`
+	Done      bool          `json:"done"`
+}
+
 type ollamaOptions struct {
 	Temperature float32 `json:"temperature,omitempty"`
 	NumPredict  int     `json:"num_predict,omitempty"`
@@ -63,29 +82,46 @@ func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, e
 }
 
 func (p *OllamaProvider) GenerateWithOptions(ctx context.Context, prompt string, opts GenerateOptions) (string, error) {
+	// Convert single prompt to message history format
+	messages := []Message{
+		{Role: "user", Content: prompt},
+	}
+	return p.GenerateWithHistory(ctx, messages, opts)
+}
+
+func (p *OllamaProvider) GenerateWithHistory(ctx context.Context, messages []Message, opts GenerateOptions) (string, error) {
 	model := p.model
 	if opts.Model != "" {
 		model = opts.Model
 	}
 
-	reqBody := ollamaGenerateRequest{
-		Model:  model,
-		Prompt: prompt,
-		Stream: false,
-	}
+	// Convert our Message format to Ollama's format
+	ollamaMessages := make([]ollamaMessage, 0, len(messages)+1)
 
-	// Include AGENTS.md content in the system prompt
+	// Add system message if we have system prompt
 	systemPrompt := opts.SystemPrompt
 	if systemPrompt == "" {
-		// Load AGENTS.md even if no system prompt is provided
 		systemPrompt = PrependAgentsContext("")
 	} else {
-		// Prepend AGENTS.md to existing system prompt
 		systemPrompt = PrependAgentsContext(systemPrompt)
 	}
 
 	if systemPrompt != "" {
-		reqBody.System = systemPrompt
+		ollamaMessages = append(ollamaMessages, ollamaMessage{
+			Role:    "system",
+			Content: systemPrompt,
+		})
+	}
+
+	// Add conversation messages
+	for _, msg := range messages {
+		ollamaMessages = append(ollamaMessages, ollamaMessage(msg))
+	}
+
+	reqBody := ollamaChatRequest{
+		Model:    model,
+		Messages: ollamaMessages,
+		Stream:   false,
 	}
 
 	if opts.Temperature > 0 {
@@ -101,7 +137,8 @@ func (p *OllamaProvider) GenerateWithOptions(ctx context.Context, prompt string,
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", p.baseURL+"/api/generate", bytes.NewBuffer(jsonBody))
+	// Use /api/chat endpoint for conversation history
+	req, err := http.NewRequestWithContext(ctx, "POST", p.baseURL+"/api/chat", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -123,12 +160,12 @@ func (p *OllamaProvider) GenerateWithOptions(ctx context.Context, prompt string,
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
-	var ollamaResp ollamaGenerateResponse
+	var ollamaResp ollamaChatResponse
 	if err := json.Unmarshal(body, &ollamaResp); err != nil {
 		return "", fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	return ollamaResp.Response, nil
+	return ollamaResp.Message.Content, nil
 }
 
 func (p *OllamaProvider) Stream(ctx context.Context, prompt string) (<-chan StreamResponse, error) {

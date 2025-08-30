@@ -102,8 +102,14 @@ func EnableSandbox(sandboxDir string) error {
 
 // generateSandboxProfile creates a sandbox profile string for the given directory
 func generateSandboxProfile(sandboxDir string) string {
+	// Get home directory for .rigel access
+	homeDir := os.Getenv("HOME")
+	if homeDir == "" {
+		homeDir = "/Users/" + os.Getenv("USER")
+	}
+
 	// Create a simple but effective sandbox profile
-	// Allow reads everywhere but restrict writes to current directory only
+	// Allow reads everywhere but restrict writes to current directory and .rigel only
 	profile := fmt.Sprintf(`(version 1)
 (allow default)
 (deny file-write*
@@ -111,12 +117,13 @@ func generateSandboxProfile(sandboxDir string) string {
     (subpath "/"))
 (allow file-write*
     (subpath "%s")
+    (subpath "%s/.rigel")
     (regex #"^/private/var/")
     (regex #"^/var/")
     (regex #"^/private/tmp/")
     (regex #"^/tmp/")
     (regex #"^/dev/"))
-`, sandboxDir)
+`, sandboxDir, homeDir)
 
 	return profile
 }

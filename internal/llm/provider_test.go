@@ -22,6 +22,33 @@ func (m *MockProvider) GenerateWithOptions(ctx context.Context, prompt string, o
 	return args.String(0), args.Error(1)
 }
 
+func (m *MockProvider) GenerateWithHistory(ctx context.Context, messages []Message, opts GenerateOptions) (string, error) {
+	args := m.Called(ctx, messages, opts)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockProvider) Stream(ctx context.Context, prompt string) (<-chan StreamResponse, error) {
+	args := m.Called(ctx, prompt)
+	if ch, ok := args.Get(0).(<-chan StreamResponse); ok {
+		return ch, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockProvider) ListModels(ctx context.Context) ([]Model, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]Model), args.Error(1)
+}
+
+func (m *MockProvider) GetCurrentModel() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+func (m *MockProvider) SetModel(model string) {
+	m.Called(model)
+}
+
 func TestGenerateOptions(t *testing.T) {
 	tests := []struct {
 		name     string
