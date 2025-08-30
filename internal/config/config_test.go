@@ -81,7 +81,7 @@ func TestLoad(t *testing.T) {
 			expectedConfig: &Config{
 				Provider:        "anthropic",
 				AnthropicAPIKey: "test-anthropic-key",
-				Model:           "claude-3-5-sonnet-20241022",
+				Model:           "claude-sonnet-4-20250514",
 				LogLevel:        "info",
 			},
 		},
@@ -122,7 +122,7 @@ func TestLoad(t *testing.T) {
 			expectedConfig: &Config{
 				Provider:        "anthropic",
 				AnthropicAPIKey: "test-key",
-				Model:           "claude-3-5-sonnet-20241022",
+				Model:           "claude-sonnet-4-20250514",
 				LogLevel:        "debug",
 			},
 		},

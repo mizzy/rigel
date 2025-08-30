@@ -47,7 +47,7 @@ func Load(configFile string) (*Config, error) {
 	}
 
 	if cfg.Provider == "anthropic" && cfg.Model == "" {
-		cfg.Model = "claude-3-5-sonnet-20241022"
+		cfg.Model = "claude-sonnet-4-20250514"
 	} else if cfg.Provider == "openai" && cfg.Model == "" {
 		cfg.Model = "gpt-4-turbo-preview"
 	} else if cfg.Provider == "ollama" && cfg.Model == "" {
