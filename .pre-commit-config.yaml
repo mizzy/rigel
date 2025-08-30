@@ -10,6 +10,13 @@ repos:
         types: [go]
         pass_filenames: false
 
+      - id: go-imports
+        name: goimports
+        entry: bash -c 'goimports -l -w .'
+        language: system
+        types: [go]
+        pass_filenames: false
+
       - id: go-vet
         name: go vet
         entry: bash -c 'go vet ./...'
