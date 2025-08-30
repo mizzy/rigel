@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ var availableCommands = []struct {
 	{"/init", "Analyze repository and generate AGENTS.md"},
 	{"/model", "Show current model and select from available models"},
 	{"/provider", "Switch between LLM providers (Anthropic, Ollama, etc.)"},
+	{"/status", "Show current session status and configuration"},
 	{"/help", "Show available commands"},
 	{"/clear", "Clear chat history"},
 	{"/clearhistory", "Clear command history"},
@@ -37,6 +39,9 @@ func (m *ChatModel) handleCommand(trimmedPrompt string) tea.Cmd {
 
 	case "/provider":
 		return m.showProviderSelector()
+
+	case "/status":
+		return m.showStatus()
 
 	case "/help":
 		return m.showHelp()
@@ -158,6 +163,71 @@ func (m *ChatModel) showProviderSelector() tea.Cmd {
 		return providerSelectorMsg{
 			currentProvider: currentProvider,
 			providers:       providers,
+		}
+	}
+}
+
+// showStatus displays the current session status and configuration
+func (m *ChatModel) showStatus() tea.Cmd {
+	return func() tea.Msg {
+		var status strings.Builder
+		status.WriteString("📊 Current Session Status\n")
+		status.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
+
+		// Provider and Model Information
+		status.WriteString("🤖 LLM Configuration:\n")
+		if m.config != nil {
+			status.WriteString(fmt.Sprintf("  Provider: %s\n", m.config.Provider))
+		}
+		if m.provider != nil {
+			status.WriteString(fmt.Sprintf("  Model: %s\n", m.provider.GetCurrentModel()))
+		}
+		status.WriteString("\n")
+
+		// Chat History Status
+		status.WriteString("💬 Chat History:\n")
+		status.WriteString(fmt.Sprintf("  Messages: %d\n", len(m.history)))
+
+		// Calculate token usage (approximate)
+		totalUserChars := 0
+		totalAssistantChars := 0
+		for _, exchange := range m.history {
+			totalUserChars += len(exchange.Prompt)
+			totalAssistantChars += len(exchange.Response)
+		}
+		approxUserTokens := totalUserChars / 4 // Rough approximation: 1 token ≈ 4 chars
+		approxAssistantTokens := totalAssistantChars / 4
+
+		status.WriteString(fmt.Sprintf("  Approximate tokens (user): ~%d\n", approxUserTokens))
+		status.WriteString(fmt.Sprintf("  Approximate tokens (assistant): ~%d\n", approxAssistantTokens))
+		status.WriteString(fmt.Sprintf("  Total approximate tokens: ~%d\n", approxUserTokens+approxAssistantTokens))
+		status.WriteString("\n")
+
+		// Command History Status
+		status.WriteString("📝 Command History:\n")
+		status.WriteString(fmt.Sprintf("  Commands in history: %d\n", len(m.inputHistory)))
+		if m.historyManager != nil {
+			status.WriteString("  Persistent history: Enabled\n")
+		} else {
+			status.WriteString("  Persistent history: Disabled\n")
+		}
+		status.WriteString("\n")
+
+		// Environment Information
+		status.WriteString("🔧 Environment:\n")
+		if m.config != nil && m.config.LogLevel != "" {
+			status.WriteString(fmt.Sprintf("  Log level: %s\n", m.config.LogLevel))
+		}
+
+		// Check for AGENTS.md
+		if _, err := os.Stat("AGENTS.md"); err == nil {
+			status.WriteString("  Repository context: AGENTS.md loaded\n")
+		} else {
+			status.WriteString("  Repository context: Not initialized (run /init)\n")
+		}
+
+		return aiResponse{
+			content: status.String(),
 		}
 	}
 }
