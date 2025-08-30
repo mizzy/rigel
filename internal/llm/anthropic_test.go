@@ -27,7 +27,7 @@ func TestNewAnthropicProvider(t *testing.T) {
 			name:          "valid with default model",
 			apiKey:        "test-api-key",
 			model:         "",
-			expectedModel: "claude-3-5-sonnet-20241022",
+			expectedModel: "claude-sonnet-4-20250514",
 			expectedError: false,
 		},
 		{

@@ -2,7 +2,11 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -11,6 +15,7 @@ import (
 type AnthropicProvider struct {
 	client *anthropic.Client
 	model  string
+	apiKey string
 }
 
 func NewAnthropicProvider(apiKey string, model string) (*AnthropicProvider, error) {
@@ -23,12 +28,13 @@ func NewAnthropicProvider(apiKey string, model string) (*AnthropicProvider, erro
 	)
 
 	if model == "" {
-		model = "claude-3-5-sonnet-20241022"
+		model = "claude-sonnet-4-20250514"
 	}
 
 	return &AnthropicProvider{
 		client: client,
 		model:  model,
+		apiKey: apiKey,
 	}, nil
 }
 
@@ -133,13 +139,21 @@ func (p *AnthropicProvider) Stream(ctx context.Context, prompt string) (<-chan S
 }
 
 func (p *AnthropicProvider) ListModels(ctx context.Context) ([]Model, error) {
-	return []Model{
-		{Name: "claude-3-5-sonnet-20241022", Details: ModelDetails{Family: "claude-3-5"}},
-		{Name: "claude-3-5-haiku-20241022", Details: ModelDetails{Family: "claude-3-5"}},
-		{Name: "claude-3-opus-20240229", Details: ModelDetails{Family: "claude-3"}},
-		{Name: "claude-3-sonnet-20240229", Details: ModelDetails{Family: "claude-3"}},
-		{Name: "claude-3-haiku-20240307", Details: ModelDetails{Family: "claude-3"}},
-	}, nil
+	// Try to fetch models from API
+	models, err := p.fetchModelsFromAPI(ctx)
+	if err != nil {
+		// Fall back to hardcoded list if API call fails
+		return []Model{
+			{Name: "claude-sonnet-4-20250514", Details: ModelDetails{Family: "claude-4"}},
+			{Name: "claude-opus-4-20250131", Details: ModelDetails{Family: "claude-4"}},
+			{Name: "claude-3-5-sonnet-20241022", Details: ModelDetails{Family: "claude-3-5"}},
+			{Name: "claude-3-5-haiku-20241022", Details: ModelDetails{Family: "claude-3-5"}},
+			{Name: "claude-3-opus-20240229", Details: ModelDetails{Family: "claude-3"}},
+			{Name: "claude-3-sonnet-20240229", Details: ModelDetails{Family: "claude-3"}},
+			{Name: "claude-3-haiku-20240307", Details: ModelDetails{Family: "claude-3"}},
+		}, nil
+	}
+	return models, nil
 }
 
 func (p *AnthropicProvider) GetCurrentModel() string {
@@ -148,4 +162,76 @@ func (p *AnthropicProvider) GetCurrentModel() string {
 
 func (p *AnthropicProvider) SetModel(model string) {
 	p.model = model
+}
+
+// anthropicModelResponse represents the API response structure
+type anthropicModelResponse struct {
+	Data []struct {
+		ID          string    `json:"id"`
+		Type        string    `json:"type"`
+		DisplayName string    `json:"display_name"`
+		CreatedAt   time.Time `json:"created_at"`
+	} `json:"data"`
+	HasMore bool   `json:"has_more"`
+	FirstID string `json:"first_id"`
+	LastID  string `json:"last_id"`
+}
+
+func (p *AnthropicProvider) fetchModelsFromAPI(ctx context.Context) ([]Model, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.anthropic.com/v1/models", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("x-api-key", p.apiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch models: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var modelsResp anthropicModelResponse
+	if err := json.Unmarshal(body, &modelsResp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	models := make([]Model, 0, len(modelsResp.Data))
+	for _, m := range modelsResp.Data {
+		// Extract family from model ID
+		family := "claude"
+		if len(m.ID) > 6 {
+			family = m.ID[:6]
+		}
+
+		models = append(models, Model{
+			Name: m.ID,
+			Details: ModelDetails{
+				Family: family,
+			},
+		})
+	}
+
+	// If no models returned from API, return error to trigger fallback
+	if len(models) == 0 {
+		return nil, fmt.Errorf("no models returned from API")
+	}
+
+	return models, nil
 }

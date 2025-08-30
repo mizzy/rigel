@@ -18,6 +18,7 @@ var availableCommands = []struct {
 }{
 	{"/init", "Analyze repository and generate AGENTS.md"},
 	{"/model", "Show current model and select from available models"},
+	{"/provider", "Switch between LLM providers (Anthropic, Ollama, etc.)"},
 	{"/help", "Show available commands"},
 	{"/clear", "Clear chat history"},
 	{"/exit", "Exit the application"},
@@ -32,6 +33,9 @@ func (m *ChatModel) handleCommand(trimmedPrompt string) tea.Cmd {
 
 	case "/model":
 		return m.showModelSelector()
+
+	case "/provider":
+		return m.showProviderSelector()
 
 	case "/help":
 		return m.showHelp()
@@ -126,6 +130,30 @@ func (m *ChatModel) showModelSelector() tea.Cmd {
 		return modelSelectorMsg{
 			currentModel: currentModel,
 			models:       models,
+		}
+	}
+}
+
+type providerSelectorMsg struct {
+	currentProvider string
+	providers       []string
+	err             error
+}
+
+func (m *ChatModel) showProviderSelector() tea.Cmd {
+	return func() tea.Msg {
+		// Get available providers
+		providers := []string{"anthropic", "ollama"}
+
+		// Get current provider from config
+		currentProvider := ""
+		if m.config != nil {
+			currentProvider = m.config.Provider
+		}
+
+		return providerSelectorMsg{
+			currentProvider: currentProvider,
+			providers:       providers,
 		}
 	}
 }

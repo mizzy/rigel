@@ -9,12 +9,14 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/llm"
 )
 
 // ChatModel represents the main chat interface
 type ChatModel struct {
 	provider llm.Provider
+	config   *config.Config
 	input    textarea.Model
 	spinner  spinner.Model
 
@@ -38,6 +40,11 @@ type ChatModel struct {
 	filteredModels     []llm.Model
 	selectedModelIndex int
 	modelFilter        string
+
+	// Provider selection mode
+	providerSelectionMode bool
+	availableProviders    []string
+	selectedProviderIndex int
 }
 
 // Exchange represents a single chat exchange
@@ -47,7 +54,7 @@ type Exchange struct {
 }
 
 // NewChatModel creates a new chat model instance
-func NewChatModel(provider llm.Provider) *ChatModel {
+func NewChatModel(provider llm.Provider, cfg *config.Config) *ChatModel {
 	ta := textarea.New()
 	ta.Placeholder = "Type a message or / for commands (Alt+Enter for new line)"
 	ta.Focus()
@@ -86,6 +93,7 @@ func NewChatModel(provider llm.Provider) *ChatModel {
 
 	return &ChatModel{
 		provider:     provider,
+		config:       cfg,
 		input:        ta,
 		spinner:      s,
 		history:      []Exchange{},
@@ -109,6 +117,11 @@ func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Handle provider selection mode
+		if m.providerSelectionMode {
+			return m.handleProviderSelectionKey(msg)
+		}
+
 		// Handle model selection mode
 		if m.modelSelectionMode {
 			return m.handleModelSelectionKey(msg)
@@ -230,6 +243,27 @@ func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
+	case providerSelectorMsg:
+		if msg.err != nil {
+			return m, func() tea.Msg {
+				return aiResponse{err: msg.err}
+			}
+		}
+
+		m.providerSelectionMode = true
+		m.availableProviders = msg.providers
+		m.selectedProviderIndex = 0
+
+		// Find current provider index
+		for i, p := range msg.providers {
+			if p == msg.currentProvider {
+				m.selectedProviderIndex = i
+				break
+			}
+		}
+
+		return m, nil
+
 	case modelSelectorMsg:
 		if msg.err != nil {
 			return m, func() tea.Msg {
@@ -245,6 +279,16 @@ func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.input.SetValue("")
 		m.input.Placeholder = "Type to filter models, Enter to select, Esc to cancel"
 
+		return m, nil
+
+	case providerSwitchResponse:
+		m.provider = msg.provider
+		m.thinking = false
+		m.history = append(m.history, Exchange{
+			Prompt:   m.currentPrompt,
+			Response: fmt.Sprintf("Switched to provider: %s\nCurrent model: %s", msg.providerName, m.provider.GetCurrentModel()),
+		})
+		m.currentPrompt = ""
 		return m, nil
 
 	case aiResponse:
@@ -274,6 +318,37 @@ func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+func (m *ChatModel) handleProviderSelectionKey(msg tea.KeyMsg) (*ChatModel, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		m.exitProviderSelection()
+		return m, nil
+
+	case tea.KeyEnter:
+		if m.selectedProviderIndex < len(m.availableProviders) {
+			selectedProvider := m.availableProviders[m.selectedProviderIndex]
+			m.exitProviderSelection()
+			return m, m.switchProvider(selectedProvider)
+		}
+		return m, nil
+
+	case tea.KeyUp:
+		if m.selectedProviderIndex > 0 {
+			m.selectedProviderIndex--
+		}
+		return m, nil
+
+	case tea.KeyDown:
+		if m.selectedProviderIndex < len(m.availableProviders)-1 {
+			m.selectedProviderIndex++
+		}
+		return m, nil
+
+	default:
+		return m, nil
+	}
 }
 
 func (m *ChatModel) handleModelSelectionKey(msg tea.KeyMsg) (*ChatModel, tea.Cmd) {
@@ -317,6 +392,13 @@ func (m *ChatModel) handleModelSelectionKey(msg tea.KeyMsg) (*ChatModel, tea.Cmd
 	}
 }
 
+func (m *ChatModel) exitProviderSelection() {
+	m.providerSelectionMode = false
+	m.availableProviders = nil
+	m.selectedProviderIndex = 0
+	m.thinking = false
+}
+
 func (m *ChatModel) exitModelSelection() {
 	m.modelSelectionMode = false
 	m.input.SetValue("")
@@ -325,6 +407,7 @@ func (m *ChatModel) exitModelSelection() {
 	m.filteredModels = nil
 	m.availableModels = nil
 	m.selectedModelIndex = 0
+	m.thinking = false
 }
 
 func (m *ChatModel) filterModels() {
@@ -339,6 +422,26 @@ func (m *ChatModel) filterModels() {
 	for _, model := range m.availableModels {
 		if strings.Contains(strings.ToLower(model.Name), filter) {
 			m.filteredModels = append(m.filteredModels, model)
+		}
+	}
+}
+
+func (m *ChatModel) switchProvider(providerName string) tea.Cmd {
+	return func() tea.Msg {
+		// Update config
+		if m.config != nil {
+			m.config.Provider = providerName
+		}
+
+		// Create new provider
+		newProvider, err := llm.NewProvider(m.config)
+		if err != nil {
+			return aiResponse{err: fmt.Errorf("failed to switch provider: %w", err)}
+		}
+
+		return providerSwitchResponse{
+			provider:     newProvider,
+			providerName: providerName,
 		}
 	}
 }
@@ -373,6 +476,44 @@ func (m ChatModel) View() string {
 		// Assistant response
 		s.WriteString(outputStyle.Render(ex.Response))
 		s.WriteString("\n\n")
+	}
+
+	// Display provider selection interface if in provider selection mode
+	if m.providerSelectionMode {
+		s.WriteString("\nProvider Selection\n\n")
+		currentProvider := ""
+		if m.config != nil {
+			currentProvider = m.config.Provider
+		}
+		s.WriteString(fmt.Sprintf("Current: %s\n\n", currentModelStyle.Render(currentProvider)))
+
+		s.WriteString("Available providers:\n")
+		for i, provider := range m.availableProviders {
+			prefix := "  "
+			isSelected := i == m.selectedProviderIndex
+			isCurrent := provider == currentProvider
+
+			providerDisplay := provider
+
+			// Apply styles based on state
+			if isCurrent {
+				// Current provider gets blue bold style
+				providerDisplay = currentModelStyle.Render(providerDisplay)
+				if isSelected {
+					prefix = currentModelStyle.Render("❯ ")
+				}
+			} else if isSelected {
+				// Selected (cursor) provider gets yellow style
+				providerDisplay = selectedModelStyle.Render(providerDisplay)
+				prefix = selectedModelStyle.Render("❯ ")
+			}
+
+			s.WriteString(fmt.Sprintf("%s%s\n", prefix, providerDisplay))
+		}
+
+		s.WriteString("\nUse up/down arrows to navigate, Enter to select, Esc to cancel")
+
+		return s.String()
 	}
 
 	// Display model selection interface if in model selection mode
@@ -497,6 +638,12 @@ func (m *ChatModel) requestResponse(prompt string) tea.Cmd {
 type aiResponse struct {
 	content string
 	err     error
+}
+
+// providerSwitchResponse represents a provider switch response
+type providerSwitchResponse struct {
+	provider     llm.Provider
+	providerName string
 }
 
 // navigateHistory navigates through input history
