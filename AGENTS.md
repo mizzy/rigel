@@ -1,202 +1,178 @@
 # AGENTS.md
 
+> **⚠️ Note** – This file is auto‑generated from the current repository snapshot and is meant to aid automated agents and developers in quickly understanding the codebase. It may not be exhaustive; for deeper dives consult the source files and the documentation in the repository.
+
 ---
 
 ## 1. Repository Overview
 
-**Rigel – AI Coding Agent**
-Rigel is a lightweight, open‑source AI agent written in Go that can *write, read, edit and execute* code on a local machine.
-It is designed to be run from the command line, but it also ships a fully‑functional terminal UI that allows you to:
+| Item | Detail |
+|------|--------|
+| **Project name** | **Rigel** |
+| **Type** | Command‑line LLM‑powered tool for code exploration and debugging |
+| **Purpose** | Provide a lightweight, pluggable framework for interacting with large language models (LLMs) via a rich set of tools (file browsing, code analysis, TUI). It is designed to be extended with custom tools, LLM providers, and UI back‑ends. |
 
-- Ask the agent to implement or fix a piece of code
-- Inspect the agent’s plan and the current state of the workspace
-- Step through the agent’s actions and see the results in real time
+Rigel sits at the intersection of two key concepts:
 
-The project is intentionally modular so you can drop in your own LLM provider or tools, or replace the UI with a web or desktop frontend.
+1. **LLM‑driven assistance** – Leverage modern LLMs (Anthropic, Ollama, etc.) to generate code, answer questions, or analyze codebases.
+2. **Tool‑based agent architecture** – Expose a set of small, deterministic tools that the LLM can invoke to get reliable data (e.g., read file contents, analyze code complexity).
+
+The command‑line binary (`cmd/rigel`) offers a simple “agent” that you can run in your terminal to query or manipulate your local repository.
 
 ---
 
 ## 2. Main Components
 
-| Package | Purpose |
-|---------|---------|
-| `cmd/rigel` | The CLI entry point (`main.go`) – loads configuration, creates an `Agent` instance and launches the interactive loop or the TUI. |
-| `internal/agent` | Core business logic. An `Agent` owns a *plan executor*, a *tool executor* and a *LLM provider*. |
-| `internal/config` | Declarative JSON/YAML config parser. Describes which LLM provider to use, API keys, tool set, and agent defaults. |
-| `internal/llm` | LLM abstraction layer. `Provider` interface + concrete implementations (`anthropic.go`, `ollama.go`). |
-| `internal/tools` | Collection of *tools* that the agent can call. Each tool implements `Tool` interface – currently a *code editor* and a *file reader*. |
-| `internal/tui` | Terminal UI (TUI). Uses `tview` to render the agent’s state, chat log, tool outputs and a syntax‑highlighted editor. |
-| `examples` | Sample projects that demonstrate how to let Rigel auto‑generate/modify code. |
+| Package | Sub‑directory | Purpose |
+|---------|---------------|---------|
+| **cmd** | `cmd/rigel` | Entry‑point. Parses CLI flags, initializes the agent stack, and starts the TUI or CLI mode. |
+| **internal/agent** | `internal/agent` | Core agent loop, orchestrates prompts, tool selection, and result aggregation. |
+| **internal/config** | `internal/config` | Holds configuration structs (LLM settings, tool list, UI mode) and parses config files/flags. |
+| **internal/llm** | `internal/llm` | LLM abstraction layer. Includes implementations for Anthropic (`anthropic.go`) and Ollama (`ollama.go`). `provider.go` defines the common interface. |
+| **internal/tools** | `internal/tools` | Collection of small utilities that can be invoked by the agent. Each implements the `Tool` interface. |
+| **internal/tui** | `internal/tui` | Text‑user‑interface modules. `analyzer.go` provides a code‑analysis view, while `simple.go` is a minimal UI mode. |
+| **examples** | `examples/` | Example code snippets and usage demonstrations. |
+| **bin** | `bin/` | Optional binary artifacts or scripts (currently empty). |
+
+> **Why this structure?**
+> The `internal/` package keeps the core logic private to the repository, enforcing encapsulation while still allowing unit tests to import sub‑packages. The `cmd/` folder remains the only public API, simplifying binary distribution.
 
 ---
 
 ## 3. Key Files
 
-| File | Why it matters |
-|------|----------------|
-| `cmd/rigel/main.go` | Starts the application: loads config, builds an `Agent`, selects UI mode, and begins the event loop. |
-| `internal/agent/agent.go` | Exposes `NewAgent(cfg *config.Config)` and orchestrates the *LLM → Plan → Tool* pipeline. |
-| `internal/config/config.go` | Parses `config.yaml` (or `$RIGEL_CONFIG_PATH`). Validates provider settings and tool configuration. |
-| `internal/llm/provider.go` | Declares the `Provider` interface – `Chat(messages []Message) (string, error)`. |
-| `internal/llm/anthropic.go` | Implements the Anthropic Claude API client. |
-| `internal/llm/ollama.go` | Implements the local Ollama client (`POST /api/chat`). |
-| `internal/tools/tool.go` | Declares the `Tool` interface – `Name()`, `Description()`, `Run(args string) (string, error)`. |
-| `internal/tools/code_tool.go` | Reads, edits and writes code files; also can compile / run tests. |
-| `internal/tools/file_tool.go` | Provides read-only file content. |
-| `internal/tui/model.go` | Holds the UI state – messages, tool outputs, editor content. |
-| `internal/tui/components.go` | UI widgets (chat pane, tool pane, editor). |
-| `internal/tui/theme.go` | Light / dark color schemes for `tview`. |
+| File | Path | Why It Matters |
+|------|------|----------------|
+| **Agent orchestrator** | `internal/agent/agent.go` | Implements the main loop that feeds LLM prompts, selects tools, and composes the final answer. |
+| **CLI entry point** | `cmd/rigel/main.go` | Parses command‑line flags, loads config, and boots the agent + TUI. |
+| **LLM provider abstraction** | `internal/llm/provider.go` | Defines `LLMProvider` interface; enables adding new providers (OpenAI, Claude, etc.) without touching the agent logic. |
+| **Anthropic integration** | `internal/llm/anthropic.go` | Handles authentication, request construction, and response parsing for Anthropic models. |
+| **Ollama integration** | `internal/llm/ollama.go` | Supports local LLMs via the Ollama API – great for privacy or offline use. |
+| **Config loader** | `internal/config/config.go` | Parses YAML/JSON config files, command‑line flags, and sets defaults. |
+| **File tool** | `internal/tools/file_tool.go` | Allows the agent to read or write files safely – a critical tool for code analysis. |
+| **Code analysis tool** | `internal/tools/code_tool.go` | Wraps simple code‑metrics (lines, complexity) for the LLM to query. |
+| **Tool interface** | `internal/tools/tool.go` | Uniform contract for all tools. Facilitates easy addition of new tools. |
+| **TUI analyzer view** | `internal/tui/analyzer.go` | Presents code analysis results interactively; uses termui for rich output. |
+| **TUI simple mode** | `internal/tui/simple.go` | Fallback minimal interface (text‑only). Useful for CI or headless environments. |
 
 ---
 
-## 4. Architecture
+## 4. Development Information
 
-```
-CLI (cmd/rigel) ──┐
-                 │
-          ┌───────┴───────────────┐
-          │  Agent (internal/agent)│
-          │  ┌───────────────┐     │
-          │  │  LLM Provider │     │
-          │  │ (anthropic.go │     │
-          │  │  ollama.go)   │     │
-          │  └───────┬───────┘     │
-          │          │             │
-          │  ┌───────┴───────┐     │
-          │  │  Tool Set     │     │
-          │  │  (code_tool, │     │
-          │  │   file_tool) │     │
-          │  └───────┬───────┘     │
-          │          │             │
-          └───────┬──┴─────────────┘
-                  │
-      ┌───────────┴─────────────┐
-      │  Terminal UI (tview)    │
-      └─────────────────────────┘
-```
+### 4.1 Prerequisites
 
-**Workflow**
+- Go 1.22+ (tested with 1.23)
+- Optional: an LLM provider account (Anthropic, OpenAI, etc.) or a local Ollama installation
 
-1. **Prompt** – User types a request into the chat pane.
-2. **LLM** – The request is sent to the chosen LLM provider; the model outputs a *plan* and optional *tool calls*.
-3. **Planner** – Agent parses the plan, decides which tool(s) to invoke.
-4. **Tools** – Each tool receives arguments and returns a string (or error).
-5. **Re‑invoke LLM** – The tool outputs are fed back to the LLM, which may generate updated code or additional actions.
-6. **Apply** – If the plan calls for code changes, the `code_tool` writes to disk and optionally runs tests.
-7. **Display** – All messages, tool outputs and the latest file contents are rendered in the TUI.
-
----
-
-## 5. Technologies Used
-
-| Category | Library / Tool | Reason |
-|----------|----------------|--------|
-| **Language** | Go 1.20+ | Strong static typing, easy concurrency, great tooling. |
-| **CLI** | `cobra` (indirect) | Structured command handling and flags. |
-| **Configuration** | `encoding/json` & `gopkg.in/yaml.v3` | Human‑readable YAML config with optional JSON overrides. |
-| **LLM Providers** | HTTP client (`net/http`) | Custom implementation for Anthropic & Ollama REST APIs. |
-| **Terminal UI** | `github.com/rivo/tview` | Rich, cross‑platform TUI with syntax highlighting and focus management. |
-| **Testing** | `testing`, `httptest` | Unit and integration tests for LLM providers, tools, and agent orchestration. |
-| **Build** | `go build`, `go test` | Standard Go toolchain. |
-| **Linting / Formatting** | `golangci-lint`, `go fmt` | Maintains code quality. |
-
----
-
-## 6. Getting Started
-
-### 1. Prerequisites
-
-| Requirement | Install |
-|-------------|---------|
-| Go 1.20+ | `brew install go` or from <https://go.dev/dl/> |
-| Ollama (optional) | `docker pull ollama/ollama && docker run -p 11434:11434 ollama/ollama` |
-| Anthropic API key | Set `ANTHROPIC_API_KEY` env var |
-
-> **Tip** – If you only want to try the CLI, the bundled `examples/simple` project will work with either Ollama or Anthropic.
-
-### 2. Clone & Build
+### 4.2 Building
 
 ```bash
-git clone https://github.com/yourorg/feat-interactive.git
-cd feat-interactive
-go build ./cmd/rigel
+# Build the binary
+go build -o bin/rigel ./cmd/rigel
 ```
 
-### 3. Create a Config
-
-```yaml
-# config.yaml
-llm:
-  provider: "anthropic"     # or "ollama"
-  model: "claude-3-5-sonnet-20240620"
-  temperature: 0.2
-  anthropic_api_key: "${ANTHROPIC_API_KEY}"   # can be env var reference
-
-tools:
-  - name: "code_tool"
-    description: "Edit code files and optionally run tests."
-  - name: "file_tool"
-    description: "Read file contents."
-
-agent:
-  max_iterations: 10
-```
-
-> Place the file at `config.yaml` or export `RIGEL_CONFIG_PATH=/path/to/config.yaml`.
-
-### 4. Run Rigel
+### 4.3 Running
 
 ```bash
-# Interactive chat + TUI
-./rigel
+# Minimal example using local Ollama
+./bin/rigel --llm-provider=ollama --ollama-model=llama3.1
+
+# With Anthropic (set env var or use config file)
+export ANTHROPIC_API_KEY="sk-..."
+./bin/rigel --llm-provider=anthropic --anthropic-model=claude-3.5-sonnet
 ```
 
-You’ll see a split view: left is the chat log, right is a syntax‑highlighted editor.
-Type a request such as:
-
-```
-Add a unit test for the `Sum` function in `math.go`.
-```
-
-The agent will plan, edit the file, run `go test`, and show you the diff and test results.
-
-### 5. Run Tests
+### 4.4 Testing
 
 ```bash
+# Run all tests (unit + integration)
 go test ./...
+
+# Run tests for a specific package
+go test ./internal/agent
 ```
 
-All packages are covered by unit tests. Integration tests use `httptest` servers to mock LLM providers.
+> **Tip** – Most tests use `httptest` servers to mock LLM responses, so they run offline.
+
+### 4.5 Contributing
+
+1. Fork the repo and clone.
+2. Create a feature branch `feat/<feature-name>`.
+3. Write tests that cover your change.
+4. Run `go test ./...` to ensure all tests pass.
+5. Add a short comment in the PR description explaining the feature or bug fix.
+
+All PRs must include unit tests and follow the existing coding style. The linter (`golangci-lint run`) will be automatically executed by GitHub Actions.
+
+### 4.6 CI
+
+- **Linting**: `golangci-lint` on push.
+- **Tests**: Run on all Go versions 1.20–1.23.
+- **Build**: Generate binaries for Linux, macOS, Windows.
 
 ---
 
-## 7. Development Guidelines
+## 5. Architecture Overview
 
-| Guideline | What to follow |
-|-----------|----------------|
-| **Interface‑First** | Use the `Provider` and `Tool` interfaces to write plug‑in components. Add new tools by creating a struct that implements `Name()`, `Description()`, `Run(args string)`. |
-| **JSON/YAML Config** | Keep configuration declarative. Add new fields to `config.Config` and update validation logic. Avoid hard‑coding values. |
-| **Error Handling** | Wrap LLM errors with context (`fmt.Errorf("LLM request failed: %w", err)`). Never swallow errors – they must surface to the UI. |
-| **Testing** | Prefer table‑driven tests. Use `httptest.NewServer` for LLM provider tests. Mock file I/O when possible (`io/fs`). |
-| **TUI Updates** | All UI updates must happen on the main goroutine. Use `tview.Application.QueueUpdateDraw` when updating from goroutines. |
-| **Command Flags** | Keep CLI flags minimal. Expose a `--config` flag for custom config path. |
-| **Documentation** | Add comments to exported types/methods. `go doc` should be useful. |
-| **Linting** | Run `golangci-lint run` before PRs. |
-| **Security** | Never log raw API keys. Redact sensitive fields in logs. |
+```
++-----------------+      +----------------+      +------------------+
+|  CLI / TUI      |<---->|  Agent Core    |<---->|   LLM Provider   |
+| (cmd/rigel)     |      | (internal/agent)|      | (anthropic.go,   |
++-----------------+      +----------------+      |  ollama.go)      |
+          |                     |               +------------------+
+          |                     |                           ^
+          v                     v                           |
++-----------------+      +----------------+                |
+|  Config Loader  |<---->|  Tool Registry |<---------------+
+| (internal/config)|      | (internal/tools)|
++-----------------+      +----------------+
 
----
+```
 
-### Quick Reference
-
-| Command | Description |
-|---------|-------------|
-| `./rigel` | Launch TUI. |
-| `./rigel --config=/path/to/config.yaml` | Override config path. |
-| `go run cmd/rigel/main.go` | Run without building. |
-| `go test -run TestAgent` | Run agent unit tests. |
-
-Feel free to open issues or PRs if you discover bugs or want to add new features – Rigel is intentionally minimal and extensible!
+* **CLI/TUI** – User-facing layer that collects input and displays results.
+* **Agent Core** – Decision engine: chooses which tool to call based on LLM outputs, orchestrates conversation, and formats final answers.
+* **LLM Provider** – Abstracts API calls; multiple back‑ends supported.
+* **Tool Registry** – Holds all available tools; each implements a simple interface, enabling easy extension.
+* **Config Loader** – Centralizes configuration from flags, env vars, and config files.
 
 ---
 
-*This file was automatically generated by Rigel AI to help AI agents understand this codebase.*
+## 6. Additional Information for AI Agents
+
+| Topic | Detail |
+|-------|--------|
+| **Tool Usage Pattern** | The agent emits a tool call in a JSON structure `<tool_name>:<payload>`. The agent core parses it, invokes the corresponding tool, then feeds the tool’s output back into the LLM as a system message. |
+| **LLM Prompt Template** | The base prompt includes placeholders for context, the user's query, and tool usage guidelines. It is defined in `internal/agent/agent.go` and can be overridden via a config file. |
+| **Extending LLM Providers** | Implement `LLMProvider` interface in `internal/llm/provider.go` and register it via `config` (e.g., `RegisterProvider("myprovider", NewMyProvider)`). |
+| **Adding New Tools** | Create a struct that satisfies the `Tool` interface, register it in `internal/tools/tool.go`, and expose a name for the agent to reference. |
+| **Testing Strategy** | Tests exercise both the high‑level agent flow and individual tools. Use `httptest` to mock LLM calls; no real API calls in CI. |
+| **Error Handling** | All tool errors are surfaced to the LLM as system messages, allowing the LLM to respond appropriately. |
+| **Security Notes** | The File Tool respects a whitelist of directories set via config; no arbitrary file access is permitted. |
+| **Performance** | The code base is lightweight (< 3500 LOC). Tool invocations are synchronous; for async workloads consider spawning goroutines or caching results. |
+
+---
+
+### 🚀 Quick Start Summary
+
+1. **Clone & Build**
+   ```bash
+   git clone https://github.com/your-org/rigel.git
+   cd rigel
+   go build -o bin/rigel ./cmd/rigel
+   ```
+
+2. **Run with a local LLM**
+   ```bash
+   ./bin/rigel --llm-provider=ollama --ollama-model=llama3.1
+   ```
+
+3. **Query the codebase**
+   In the TUI, type:
+   `Explain the purpose of internal/agent/agent.go.`
+
+4. **Extend**
+   Add a new tool or LLM provider following the patterns documented above.
+
+---
+
+Happy coding, and may your agents be ever helpful!

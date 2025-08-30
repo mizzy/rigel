@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mizzy/rigel/internal/analyzer"
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/llm"
 	"github.com/mizzy/rigel/internal/tui"
@@ -53,12 +54,61 @@ review, and improve code through natural language interactions.`,
 				log.Fatal("No input provided")
 			}
 
-			response, err := provider.Generate(cmd.Context(), prompt)
-			if err != nil {
-				log.Fatalf("Failed to generate response: %v", err)
-			}
+			// Handle commands
+			switch prompt {
+			case "/init":
+				analyzer := analyzer.NewRepoAnalyzer(provider)
+				content, err := analyzer.Analyze()
+				if err != nil {
+					log.Fatalf("Failed to analyze repository: %v", err)
+				}
 
-			fmt.Print(response)
+				err = analyzer.WriteAgentsFile(content)
+				if err != nil {
+					log.Fatalf("Failed to write AGENTS.md: %v", err)
+				}
+
+				fmt.Println("✅ Repository analyzed successfully! AGENTS.md has been created.")
+				fmt.Println("\nThe file contains:")
+				fmt.Println("• Repository structure and overview")
+				fmt.Println("• Key components and their responsibilities")
+				fmt.Println("• File purposes and dependencies")
+				fmt.Println("• Testing and configuration information")
+				return
+
+			case "/help":
+				fmt.Println("Available commands:")
+				fmt.Println()
+				fmt.Println("  /init  - Analyze repository and generate AGENTS.md")
+				fmt.Println("  /help  - Show available commands")
+				fmt.Println("  /clear - Clear chat history (interactive mode only)")
+				fmt.Println("  /exit  - Exit the application")
+				fmt.Println()
+				fmt.Println("Keyboard shortcuts (interactive mode):")
+				fmt.Println("  Tab       - Complete command")
+				fmt.Println("  ↑/↓       - Navigate suggestions")
+				fmt.Println("  Enter     - Send message or select suggestion")
+				fmt.Println("  Alt+Enter - New line")
+				fmt.Println("  Ctrl+C    - Exit")
+				return
+
+			case "/exit":
+				fmt.Println("Goodbye!")
+				return
+
+			default:
+				if strings.HasPrefix(prompt, "/") {
+					fmt.Printf("Unknown command: %s. Type /help for available commands.\n", prompt)
+					return
+				}
+
+				response, err := provider.Generate(cmd.Context(), prompt)
+				if err != nil {
+					log.Fatalf("Failed to generate response: %v", err)
+				}
+
+				fmt.Print(response)
+			}
 		} else {
 			// Run interactive chat mode (inline, no alternate screen)
 			runChatMode(provider)
