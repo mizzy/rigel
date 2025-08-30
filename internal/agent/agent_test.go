@@ -34,6 +34,23 @@ func (m *MockProvider) Stream(ctx context.Context, prompt string) (<-chan llm.St
 	return nil, args.Error(1)
 }
 
+func (m *MockProvider) ListModels(ctx context.Context) ([]llm.Model, error) {
+	args := m.Called(ctx)
+	if models := args.Get(0); models != nil {
+		return models.([]llm.Model), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockProvider) GetCurrentModel() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+func (m *MockProvider) SetModel(model string) {
+	m.Called(model)
+}
+
 type MockTool struct {
 	mock.Mock
 }

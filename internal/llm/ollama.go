@@ -203,3 +203,45 @@ func (p *OllamaProvider) Stream(ctx context.Context, prompt string) (<-chan Stre
 
 	return ch, nil
 }
+
+type ollamaListResponse struct {
+	Models []Model `json:"models"`
+}
+
+func (p *OllamaProvider) ListModels(ctx context.Context) ([]Model, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", p.baseURL+"/api/tags", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("ollama API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var listResp ollamaListResponse
+	if err := json.Unmarshal(body, &listResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return listResp.Models, nil
+}
+
+func (p *OllamaProvider) GetCurrentModel() string {
+	return p.model
+}
+
+func (p *OllamaProvider) SetModel(model string) {
+	p.model = model
+}

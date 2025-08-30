@@ -1,11 +1,14 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mizzy/rigel/internal/analyzer"
+	"github.com/mizzy/rigel/internal/llm"
 )
 
 // Available commands
@@ -14,6 +17,7 @@ var availableCommands = []struct {
 	description string
 }{
 	{"/init", "Analyze repository and generate AGENTS.md"},
+	{"/model", "Show current model and select from available models"},
 	{"/help", "Show available commands"},
 	{"/clear", "Clear chat history"},
 	{"/exit", "Exit the application"},
@@ -25,6 +29,9 @@ func (m *ChatModel) handleCommand(trimmedPrompt string) tea.Cmd {
 	switch trimmedPrompt {
 	case "/init":
 		return m.analyzeRepository()
+
+	case "/model":
+		return m.showModelSelector()
 
 	case "/help":
 		return m.showHelp()
@@ -86,12 +93,39 @@ func (m *ChatModel) analyzeRepository() tea.Cmd {
 		}
 
 		return aiResponse{
-			content: "✅ Repository analyzed successfully! AGENTS.md has been created.\n\n" +
+			content: "Repository analyzed successfully! AGENTS.md has been created.\n\n" +
 				"The file contains:\n" +
 				"• Repository structure and overview\n" +
 				"• Key components and their responsibilities\n" +
 				"• File purposes and dependencies\n" +
 				"• Testing and configuration information",
+		}
+	}
+}
+
+type modelSelectorMsg struct {
+	currentModel string
+	models       []llm.Model
+	err          error
+}
+
+func (m *ChatModel) showModelSelector() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		currentModel := m.provider.GetCurrentModel()
+		models, err := m.provider.ListModels(ctx)
+		if err != nil {
+			return modelSelectorMsg{
+				currentModel: currentModel,
+				err:          err,
+			}
+		}
+
+		return modelSelectorMsg{
+			currentModel: currentModel,
+			models:       models,
 		}
 	}
 }
