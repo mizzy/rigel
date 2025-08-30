@@ -63,8 +63,19 @@ func TestLoad(t *testing.T) {
 		envFileContent string
 	}{
 		{
-			name: "default configuration with anthropic",
+			name:     "default configuration with ollama",
+			setupEnv: map[string]string{},
+			expectedConfig: &Config{
+				Provider:      "ollama",
+				OllamaBaseURL: "http://localhost:11434",
+				Model:         "gpt-oss:20b",
+				LogLevel:      "info",
+			},
+		},
+		{
+			name: "anthropic provider configuration",
 			setupEnv: map[string]string{
+				"PROVIDER":          "anthropic",
 				"ANTHROPIC_API_KEY": "test-anthropic-key",
 			},
 			expectedConfig: &Config{
@@ -149,8 +160,15 @@ RIGEL_LOG_LEVEL=warn`,
 			cfg, err := Load(configFile)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedConfig.Provider, cfg.Provider)
-			assert.Equal(t, tt.expectedConfig.AnthropicAPIKey, cfg.AnthropicAPIKey)
-			assert.Equal(t, tt.expectedConfig.OpenAIAPIKey, cfg.OpenAIAPIKey)
+			if tt.expectedConfig.AnthropicAPIKey != "" {
+				assert.Equal(t, tt.expectedConfig.AnthropicAPIKey, cfg.AnthropicAPIKey)
+			}
+			if tt.expectedConfig.OpenAIAPIKey != "" {
+				assert.Equal(t, tt.expectedConfig.OpenAIAPIKey, cfg.OpenAIAPIKey)
+			}
+			if tt.expectedConfig.OllamaBaseURL != "" {
+				assert.Equal(t, tt.expectedConfig.OllamaBaseURL, cfg.OllamaBaseURL)
+			}
 			assert.Equal(t, tt.expectedConfig.Model, cfg.Model)
 			assert.Equal(t, tt.expectedConfig.LogLevel, cfg.LogLevel)
 		})
@@ -229,6 +247,14 @@ func TestConfigValidate(t *testing.T) {
 			errorMsg:    "AZURE_OPENAI_API_KEY is required",
 		},
 		{
+			name: "valid ollama config",
+			config: &Config{
+				Provider:      "ollama",
+				OllamaBaseURL: "http://localhost:11434",
+			},
+			expectError: false,
+		},
+		{
 			name: "unsupported provider",
 			config: &Config{
 				Provider: "unsupported",
@@ -274,6 +300,44 @@ func TestMultipleProviderKeys(t *testing.T) {
 	assert.Equal(t, "openai-key", cfg.OpenAIAPIKey)
 	assert.Equal(t, "google-key", cfg.GoogleAPIKey)
 	assert.Equal(t, "azure-key", cfg.AzureAPIKey)
+
+	err = cfg.Validate()
+	assert.NoError(t, err)
+}
+
+func TestDefaultOllamaConfiguration(t *testing.T) {
+	// Ensure no environment variables interfere with the test
+	envVars := []string{
+		"PROVIDER",
+		"ANTHROPIC_API_KEY",
+		"OPENAI_API_KEY",
+		"GOOGLE_API_KEY",
+		"AZURE_OPENAI_API_KEY",
+		"OLLAMA_BASE_URL",
+		"MODEL",
+		"RIGEL_LOG_LEVEL",
+	}
+
+	for _, v := range envVars {
+		if val := os.Getenv(v); val != "" {
+			os.Unsetenv(v)
+			defer os.Setenv(v, val)
+		}
+	}
+
+	// Use a temp directory to avoid loading any existing .env file
+	tmpDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(oldWd)
+
+	cfg, err := Load("")
+	require.NoError(t, err)
+
+	assert.Equal(t, "ollama", cfg.Provider)
+	assert.Equal(t, "gpt-oss:20b", cfg.Model)
+	assert.Equal(t, "http://localhost:11434", cfg.OllamaBaseURL)
+	assert.Equal(t, "info", cfg.LogLevel)
 
 	err = cfg.Validate()
 	assert.NoError(t, err)
