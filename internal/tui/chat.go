@@ -258,27 +258,15 @@ func (m ChatModel) View() string {
 	if !m.thinking {
 		s.WriteString(promptSymbol)
 		s.WriteString(" ")
-		// Get the value and cursor position from textarea without its styling
-		value := m.input.Value()
-		if value == "" {
-			// Add cursor first when empty
-			if m.input.Focused() {
-				s.WriteString("█")
+		// Use textarea's native rendering to handle IME and cursor properly
+		textareaView := m.input.View()
+		// Handle multi-line alignment by replacing newlines with proper indentation
+		lines := strings.Split(textareaView, "\n")
+		for i, line := range lines {
+			if i > 0 {
+				s.WriteString("\n  ") // 2 spaces to align with prompt symbol + space
 			}
-			s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("60")).Render(" " + m.input.Placeholder))
-		} else {
-			// Add indentation for multi-line input
-			lines := strings.Split(value, "\n")
-			for i, line := range lines {
-				if i > 0 {
-					s.WriteString("\n  ") // 2 spaces to align with prompt symbol + space
-				}
-				s.WriteString(line)
-			}
-			// Add cursor after text
-			if m.input.Focused() {
-				s.WriteString("█")
-			}
+			s.WriteString(line)
 		}
 
 		// Display command suggestions
