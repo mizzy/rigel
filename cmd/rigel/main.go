@@ -14,9 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	cfg *config.Config
-)
+var cfg *config.Config
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -41,8 +39,10 @@ review, and improve code through natural language interactions.`,
 			log.Fatalf("Failed to initialize LLM provider: %v", err)
 		}
 
+		// Check if input is piped
 		stat, _ := os.Stdin.Stat()
 		if (stat.Mode() & os.ModeCharDevice) == 0 {
+			// Handle piped input
 			input, err := io.ReadAll(os.Stdin)
 			if err != nil {
 				log.Fatalf("Failed to read from stdin: %v", err)
@@ -60,19 +60,21 @@ review, and improve code through natural language interactions.`,
 
 			fmt.Print(response)
 		} else {
-			runTUIMode(cmd, provider)
+			// Run interactive chat mode (inline, no alternate screen)
+			runChatMode(provider)
 		}
 	},
 }
 
-func runTUIMode(cmd *cobra.Command, provider llm.Provider) {
+func runChatMode(provider llm.Provider) {
 	model := tui.NewSimpleModel(provider)
-	p := tea.NewProgram(model, tea.WithAltScreen())
+	p := tea.NewProgram(model)
 
 	if _, err := p.Run(); err != nil {
-		log.Fatalf("Error running TUI: %v", err)
+		log.Fatalf("Error running chat: %v", err)
 	}
 }
 
 func init() {
+	// No flags needed - inline mode is now the default and only mode
 }
