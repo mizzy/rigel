@@ -40,18 +40,48 @@ cp .env.example .env
 
 ## Configuration
 
-Create a `.env` file with the following variables:
+By default, Rigel uses Ollama with the `gpt-oss:20b` model. No API keys are required for the default configuration.
+
+### Default Configuration (Ollama)
+
+The application works out of the box with Ollama running locally:
+- Provider: `ollama`
+- Model: `gpt-oss:20b`
+- Base URL: `http://localhost:11434`
+
+Make sure Ollama is installed and running locally:
+```bash
+# Install Ollama (if not already installed)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull the default model
+ollama pull gpt-oss:20b
+
+# Start Ollama server (if not already running)
+ollama serve
+```
+
+### Custom Configuration
+
+Create a `.env` file to use different providers or models:
 
 ```bash
-# AI Model API Keys
+# Choose a provider: ollama, anthropic, openai, google, azure
+PROVIDER=anthropic
+
+# AI Model API Keys (required based on provider)
 OPENAI_API_KEY=your_openai_api_key
 ANTHROPIC_API_KEY=your_anthropic_api_key
-
-# Optional: Other LLM providers
 GOOGLE_API_KEY=your_google_api_key
 AZURE_OPENAI_API_KEY=your_azure_api_key
 
-# Configuration
+# Custom model (optional, defaults based on provider)
+MODEL=claude-3-5-sonnet-20241022
+
+# Ollama configuration (when using Ollama)
+OLLAMA_BASE_URL=http://localhost:11434
+
+# Logging
 RIGEL_LOG_LEVEL=info
 ```
 

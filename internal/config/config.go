@@ -36,7 +36,7 @@ func Load(configFile string) (*Config, error) {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	cfg := &Config{
-		Provider:        getEnv("PROVIDER", "anthropic"),
+		Provider:        getEnv("PROVIDER", "ollama"),
 		AnthropicAPIKey: os.Getenv("ANTHROPIC_API_KEY"),
 		OpenAIAPIKey:    os.Getenv("OPENAI_API_KEY"),
 		GoogleAPIKey:    os.Getenv("GOOGLE_API_KEY"),
@@ -51,7 +51,7 @@ func Load(configFile string) (*Config, error) {
 	} else if cfg.Provider == "openai" && cfg.Model == "" {
 		cfg.Model = "gpt-4-turbo-preview"
 	} else if cfg.Provider == "ollama" && cfg.Model == "" {
-		cfg.Model = "llama3.2"
+		cfg.Model = "gpt-oss:20b"
 	}
 
 	return cfg, nil
