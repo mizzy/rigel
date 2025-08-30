@@ -13,6 +13,7 @@ import (
 	"github.com/mizzy/rigel/internal/llm"
 	"github.com/mizzy/rigel/internal/sandbox"
 	"github.com/mizzy/rigel/internal/tui"
+	"github.com/mizzy/rigel/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -107,6 +108,7 @@ func runChatMode(provider llm.Provider) {
 }
 
 func init() {
+	rootCmd.AddCommand(versionCmd)
 	rootCmd.Flags().BoolVar(&sandboxFlag, "sandbox", false, "Force enable sandbox mode (default on macOS)")
 	rootCmd.Flags().BoolVar(&noSandboxFlag, "no-sandbox", false, "Disable sandbox mode explicitly")
 }
@@ -115,4 +117,12 @@ func shouldEnableSandboxByDefault() bool {
 	// Enable sandbox by default on macOS
 	// Can be expanded to other platforms in the future
 	return runtime.GOOS == "darwin"
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print the version of rigel",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(version.String())
+	},
 }
