@@ -15,6 +15,7 @@ type Config struct {
 	OpenAIAPIKey    string
 	GoogleAPIKey    string
 	AzureAPIKey     string
+	OllamaBaseURL   string
 	Model           string
 	LogLevel        string
 }
@@ -40,6 +41,7 @@ func Load(configFile string) (*Config, error) {
 		OpenAIAPIKey:    os.Getenv("OPENAI_API_KEY"),
 		GoogleAPIKey:    os.Getenv("GOOGLE_API_KEY"),
 		AzureAPIKey:     os.Getenv("AZURE_OPENAI_API_KEY"),
+		OllamaBaseURL:   getEnv("OLLAMA_BASE_URL", "http://localhost:11434"),
 		Model:           getEnv("MODEL", ""),
 		LogLevel:        getEnv("RIGEL_LOG_LEVEL", "info"),
 	}
@@ -48,6 +50,8 @@ func Load(configFile string) (*Config, error) {
 		cfg.Model = "claude-3-5-sonnet-20241022"
 	} else if cfg.Provider == "openai" && cfg.Model == "" {
 		cfg.Model = "gpt-4-turbo-preview"
+	} else if cfg.Provider == "ollama" && cfg.Model == "" {
+		cfg.Model = "llama3.2"
 	}
 
 	return cfg, nil
@@ -78,6 +82,8 @@ func (c *Config) Validate() error {
 		if c.AzureAPIKey == "" {
 			return fmt.Errorf("AZURE_OPENAI_API_KEY is required for Azure provider")
 		}
+	case "ollama":
+		// Ollama doesn't require API key, just base URL which has a default
 	default:
 		return fmt.Errorf("unsupported provider: %s", c.Provider)
 	}
