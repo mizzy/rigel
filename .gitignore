@@ -11,6 +11,7 @@ rigel
 
 # Output of the go coverage tool
 *.out
+coverage.html
 
 # Dependency directories
 vendor/
