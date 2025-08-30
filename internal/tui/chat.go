@@ -19,6 +19,9 @@ type ChatModel struct {
 	spinner  spinner.Model
 
 	history            []Exchange
+	inputHistory       []string
+	historyIndex       int
+	currentInput       string
 	thinking           bool
 	currentPrompt      string
 	err                error
@@ -75,10 +78,12 @@ func NewChatModel(provider llm.Provider) *ChatModel {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("87")) // Match Rigel blue
 
 	return &ChatModel{
-		provider: provider,
-		input:    ta,
-		spinner:  s,
-		history:  []Exchange{},
+		provider:     provider,
+		input:        ta,
+		spinner:      s,
+		history:      []Exchange{},
+		inputHistory: []string{},
+		historyIndex: -1,
 	}
 }
 
@@ -131,19 +136,27 @@ func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Handle arrow keys for suggestion navigation
-		if m.showSuggestions && !m.thinking {
+		// Handle arrow keys for suggestion navigation or history navigation
+		if !m.thinking {
 			switch msg.String() {
 			case "up":
-				if m.selectedSuggestion > 0 {
-					m.selectedSuggestion--
+				if m.showSuggestions {
+					if m.selectedSuggestion > 0 {
+						m.selectedSuggestion--
+					}
+				} else {
+					m.navigateHistory(-1)
 				}
 				m.ctrlCPressed = false // Reset Ctrl+C flag
 				m.infoMessage = ""
 				return m, nil
 			case "down":
-				if m.selectedSuggestion < len(m.suggestions)-1 {
-					m.selectedSuggestion++
+				if m.showSuggestions {
+					if m.selectedSuggestion < len(m.suggestions)-1 {
+						m.selectedSuggestion++
+					}
+				} else {
+					m.navigateHistory(1)
 				}
 				m.ctrlCPressed = false // Reset Ctrl+C flag
 				m.infoMessage = ""
@@ -163,6 +176,12 @@ func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if strings.TrimSpace(m.input.Value()) != "" {
 				m.currentPrompt = m.input.Value()
+
+				// Save to input history
+				m.inputHistory = append(m.inputHistory, m.currentPrompt)
+				m.historyIndex = -1
+				m.currentInput = ""
+
 				m.input.SetValue("")
 				m.thinking = true
 				m.err = nil
@@ -188,6 +207,12 @@ func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.updateSuggestions()
 				m.ctrlCPressed = false // Reset Ctrl+C flag when typing
 				m.infoMessage = ""
+
+				// Reset history navigation if user types
+				if m.historyIndex != -1 {
+					m.historyIndex = -1
+					m.currentInput = m.input.Value()
+				}
 			}
 
 			return m, cmd
@@ -322,4 +347,42 @@ func (m *ChatModel) requestResponse(prompt string) tea.Cmd {
 type aiResponse struct {
 	content string
 	err     error
+}
+
+// navigateHistory navigates through input history
+func (m *ChatModel) navigateHistory(direction int) {
+	if len(m.inputHistory) == 0 {
+		return
+	}
+
+	// Save current input if we're starting to navigate history
+	if m.historyIndex == -1 {
+		m.currentInput = m.input.Value()
+	}
+
+	if direction < 0 {
+		// Going up (backward) in history
+		if m.historyIndex == -1 {
+			// Start from the most recent item
+			m.historyIndex = 0
+		} else if m.historyIndex < len(m.inputHistory)-1 {
+			m.historyIndex++
+		}
+
+		if m.historyIndex < len(m.inputHistory) {
+			historyPos := len(m.inputHistory) - 1 - m.historyIndex
+			m.input.SetValue(m.inputHistory[historyPos])
+		}
+	} else {
+		// Going down (forward) in history
+		if m.historyIndex > 0 {
+			m.historyIndex--
+			historyPos := len(m.inputHistory) - 1 - m.historyIndex
+			m.input.SetValue(m.inputHistory[historyPos])
+		} else if m.historyIndex == 0 {
+			// Return to current input
+			m.historyIndex = -1
+			m.input.SetValue(m.currentInput)
+		}
+	}
 }
