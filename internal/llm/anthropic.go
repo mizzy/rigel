@@ -57,9 +57,19 @@ func (p *AnthropicProvider) GenerateWithOptions(ctx context.Context, prompt stri
 		MaxTokens: anthropic.F(int64(maxTokens)),
 	}
 
-	if opts.SystemPrompt != "" {
+	// Include AGENTS.md content in the system prompt
+	systemPrompt := opts.SystemPrompt
+	if systemPrompt == "" {
+		// Load AGENTS.md even if no system prompt is provided
+		systemPrompt = PrependAgentsContext("")
+	} else {
+		// Prepend AGENTS.md to existing system prompt
+		systemPrompt = PrependAgentsContext(systemPrompt)
+	}
+
+	if systemPrompt != "" {
 		params.System = anthropic.F([]anthropic.TextBlockParam{
-			anthropic.NewTextBlock(opts.SystemPrompt),
+			anthropic.NewTextBlock(systemPrompt),
 		})
 	}
 
