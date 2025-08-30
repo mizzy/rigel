@@ -36,6 +36,8 @@ func NewProvider(cfg *config.Config) (Provider, error) {
 		return NewAnthropicProvider(cfg.AnthropicAPIKey, cfg.Model)
 	case "openai":
 		return nil, fmt.Errorf("OpenAI provider not yet implemented")
+	case "ollama":
+		return NewOllamaProvider(cfg.OllamaBaseURL, cfg.Model)
 	default:
 		if cfg.AnthropicAPIKey != "" {
 			return NewAnthropicProvider(cfg.AnthropicAPIKey, cfg.Model)
