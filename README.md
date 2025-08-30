@@ -4,14 +4,10 @@ A Go-based AI coding assistant that helps developers write, review, and improve 
 
 ## Features
 
-- 💬 **AI Chat Assistant**: Powered by multiple LLM providers (Anthropic, Ollama)
-- 🔍 **Repository Analysis**: Automatic codebase analysis with `/init` command
-- 📄 **AGENTS.md Generation**: Creates AI-friendly documentation of your codebase
-- 🖥️ **Code Generation**: Generate code from natural language descriptions
-- 🎨 **Clean Interface**: Simple, distraction-free chat interface
-- 📝 **Multiline Support**: Natural code and text input with Alt+Enter
-- ✨ **Command Autocomplete**: Tab completion for slash commands
-- 🎯 **Rigel Theme**: Blue-white star themed interface
+- AI-powered coding assistant
+- Multiple LLM providers (Anthropic, Ollama)
+- Clean terminal-based chat interface
+- Sandbox support for safe code execution
 
 ## Requirements
 
@@ -97,22 +93,23 @@ Rigel features a clean and simple chat interface for AI-assisted coding:
 rigel
 ```
 
-#### Features
-
-- 💬 **Simple Chat Interface**: Clean, distraction-free chat with AI
-- 🔍 **Repository Analysis**: Use `/init` to analyze your codebase and generate AGENTS.md
-- 📝 **Multiline Input**: Natural code and text input with Alt+Enter
-- ✨ **Command Autocomplete**: Tab completion and navigation for slash commands
-- 🎯 **Rigel Theme**: Blue-white star themed interface
-
 #### Commands
 
-| Command/Shortcut | Action |
+| Command | Action |
 |-----------------|--------|
 | `/init` | Analyze repository and generate AGENTS.md |
+| `/model` | Show current model and select from available models |
+| `/provider` | Switch between LLM providers (Anthropic, Ollama, etc.) |
+| `/status` | Show current session status and configuration |
 | `/help` | Show available commands |
 | `/clear` | Clear chat history |
+| `/clearhistory` | Clear command history |
 | `/exit` or `/quit` | Exit the application |
+
+#### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
 | `Enter` | Send message |
 | `Alt+Enter` | New line |
 | `Tab` | Complete command |
@@ -175,16 +172,21 @@ rigel/
 ├── cmd/
 │   └── rigel/         # CLI entry point
 ├── internal/
+│   ├── agent/         # AI agent functionality
 │   ├── analyzer/      # Repository analysis
+│   ├── config/        # Configuration management
+│   ├── history/       # Command history management
 │   ├── llm/           # LLM provider integrations
 │   │   ├── anthropic.go  # Anthropic Claude integration
 │   │   └── ollama.go     # Ollama local models
+│   ├── sandbox/       # Sandbox for safe code execution
+│   ├── tools/         # Tool integrations
 │   ├── tui/           # Terminal UI components
 │   │   ├── chat.go       # Main chat model
 │   │   ├── commands.go   # Command handling
 │   │   ├── suggestions.go # Autocomplete logic
 │   │   └── styles.go     # Color scheme
-│   └── config/        # Configuration management
+│   └── version/       # Version information
 ```
 
 ## Development
@@ -226,9 +228,6 @@ staticcheck ./...
 
 # Build
 make build
-
-# Build Docker image
-docker build -t rigel:latest .
 ```
 
 ## Supported LLM Providers
@@ -253,34 +252,3 @@ docker build -t rigel:latest .
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details
-
-## Acknowledgments
-
-- Inspired by Claude Code and GitHub Copilot
-- Built with modern AI models and language processing tools
-
-## Roadmap
-
-### Completed
-- [x] Interactive chat interface with Bubbletea
-- [x] Repository analysis with `/init` command
-- [x] Command autocomplete with Tab
-- [x] Multiline input support
-- [x] Multiple LLM provider support (Anthropic, Ollama)
-
-### In Progress
-- [ ] Syntax highlighting for code blocks
-- [ ] Session management (save/load conversations)
-
-### Planned
-- [ ] Additional LLM providers (OpenAI, Google, Azure)
-- [ ] File operations commands (/read, /write, /edit)
-- [ ] Git integration in TUI
-- [ ] Custom themes
-- [ ] Plugin system for custom tools
-- [ ] Web-based interface
-- [ ] VSCode extension
-
-## Support
-
-For issues and questions, please use the [GitHub Issues](https://github.com/mizzy/rigel/issues) page.
