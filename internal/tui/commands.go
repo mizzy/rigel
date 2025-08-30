@@ -171,60 +171,118 @@ func (m *ChatModel) showProviderSelector() tea.Cmd {
 func (m *ChatModel) showStatus() tea.Cmd {
 	return func() tea.Msg {
 		var status strings.Builder
-		status.WriteString("📊 Current Session Status\n")
-		status.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
-		// Provider and Model Information
-		status.WriteString("🤖 LLM Configuration:\n")
+		// Header
+		status.WriteString(statusHeaderStyle.Render("✦ Rigel Session Status"))
+		status.WriteString("\n")
+
+		// Create a full-width divider
+		dividerLine := strings.Repeat(statusDivider, 50)
+		status.WriteString(dividerLine)
+		status.WriteString("\n\n")
+
+		// LLM Configuration Section
+		status.WriteString(statusHeaderStyle.Render("🤖 LLM Configuration"))
+		status.WriteString("\n")
 		if m.config != nil {
-			status.WriteString(fmt.Sprintf("  Provider: %s\n", m.config.Provider))
+			status.WriteString(fmt.Sprintf("  %s %s\n",
+				statusLabelStyle.Render("Provider:"),
+				statusValueStyle.Bold(true).Render(m.config.Provider)))
 		}
 		if m.provider != nil {
-			status.WriteString(fmt.Sprintf("  Model: %s\n", m.provider.GetCurrentModel()))
+			status.WriteString(fmt.Sprintf("  %s %s\n",
+				statusLabelStyle.Render("Model:"),
+				statusValueStyle.Bold(true).Render(m.provider.GetCurrentModel())))
 		}
 		status.WriteString("\n")
 
-		// Chat History Status
-		status.WriteString("💬 Chat History:\n")
-		status.WriteString(fmt.Sprintf("  Messages: %d\n", len(m.history)))
+		// Chat History Section
+		status.WriteString(statusHeaderStyle.Render("💬 Chat History"))
+		status.WriteString("\n")
 
-		// Calculate token usage (approximate)
+		messageCount := len(m.history)
+		messageStyle := statusValueStyle
+		if messageCount > 100 {
+			messageStyle = statusWarningStyle
+		}
+		status.WriteString(fmt.Sprintf("  %s %s\n",
+			statusLabelStyle.Render("Messages:"),
+			messageStyle.Render(fmt.Sprintf("%d", messageCount))))
+
+		// Calculate token usage
 		totalUserChars := 0
 		totalAssistantChars := 0
 		for _, exchange := range m.history {
 			totalUserChars += len(exchange.Prompt)
 			totalAssistantChars += len(exchange.Response)
 		}
-		approxUserTokens := totalUserChars / 4 // Rough approximation: 1 token ≈ 4 chars
+		approxUserTokens := totalUserChars / 4
 		approxAssistantTokens := totalAssistantChars / 4
+		totalTokens := approxUserTokens + approxAssistantTokens
 
-		status.WriteString(fmt.Sprintf("  Approximate tokens (user): ~%d\n", approxUserTokens))
-		status.WriteString(fmt.Sprintf("  Approximate tokens (assistant): ~%d\n", approxAssistantTokens))
-		status.WriteString(fmt.Sprintf("  Total approximate tokens: ~%d\n", approxUserTokens+approxAssistantTokens))
+		// Color code token counts
+		tokenStyle := statusValueStyle
+		if totalTokens > 50000 {
+			tokenStyle = statusDangerStyle
+		} else if totalTokens > 25000 {
+			tokenStyle = statusWarningStyle
+		}
+
+		status.WriteString(fmt.Sprintf("  %s %s\n",
+			statusLabelStyle.Render("User tokens:"),
+			statusValueStyle.Render(fmt.Sprintf("~%d", approxUserTokens))))
+		status.WriteString(fmt.Sprintf("  %s %s\n",
+			statusLabelStyle.Render("Assistant tokens:"),
+			statusValueStyle.Render(fmt.Sprintf("~%d", approxAssistantTokens))))
+		status.WriteString(fmt.Sprintf("  %s %s\n",
+			statusLabelStyle.Render("Total tokens:"),
+			tokenStyle.Bold(true).Render(fmt.Sprintf("~%d", totalTokens))))
 		status.WriteString("\n")
 
-		// Command History Status
-		status.WriteString("📝 Command History:\n")
-		status.WriteString(fmt.Sprintf("  Commands in history: %d\n", len(m.inputHistory)))
+		// Command History Section
+		status.WriteString(statusHeaderStyle.Render("📝 Command History"))
+		status.WriteString("\n")
+		status.WriteString(fmt.Sprintf("  %s %s\n",
+			statusLabelStyle.Render("Commands saved:"),
+			statusValueStyle.Render(fmt.Sprintf("%d", len(m.inputHistory)))))
+
 		if m.historyManager != nil {
-			status.WriteString("  Persistent history: Enabled\n")
+			status.WriteString(fmt.Sprintf("  %s %s\n",
+				statusLabelStyle.Render("Persistence:"),
+				statusSuccessStyle.Render("✓ Enabled")))
 		} else {
-			status.WriteString("  Persistent history: Disabled\n")
+			status.WriteString(fmt.Sprintf("  %s %s\n",
+				statusLabelStyle.Render("Persistence:"),
+				statusWarningStyle.Render("✗ Disabled")))
 		}
 		status.WriteString("\n")
 
-		// Environment Information
-		status.WriteString("🔧 Environment:\n")
+		// Environment Section
+		status.WriteString(statusHeaderStyle.Render("🔧 Environment"))
+		status.WriteString("\n")
+
 		if m.config != nil && m.config.LogLevel != "" {
-			status.WriteString(fmt.Sprintf("  Log level: %s\n", m.config.LogLevel))
+			status.WriteString(fmt.Sprintf("  %s %s\n",
+				statusLabelStyle.Render("Log level:"),
+				statusValueStyle.Render(m.config.LogLevel)))
 		}
 
-		// Check for AGENTS.md
+		// Repository context
 		if _, err := os.Stat("AGENTS.md"); err == nil {
-			status.WriteString("  Repository context: AGENTS.md loaded\n")
+			status.WriteString(fmt.Sprintf("  %s %s\n",
+				statusLabelStyle.Render("Repository context:"),
+				statusSuccessStyle.Render("✓ AGENTS.md loaded")))
 		} else {
-			status.WriteString("  Repository context: Not initialized (run /init)\n")
+			status.WriteString(fmt.Sprintf("  %s %s\n",
+				statusLabelStyle.Render("Repository context:"),
+				statusWarningStyle.Render("✗ Not initialized (run /init)")))
 		}
+		status.WriteString("\n")
+
+		// Footer with hints
+		status.WriteString(dividerLine)
+		status.WriteString("\n")
+		status.WriteString(statusLabelStyle.Italic(true).Render("Tip: Use /help to see all available commands"))
 
 		return aiResponse{
 			content: status.String(),
