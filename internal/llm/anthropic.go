@@ -15,7 +15,7 @@ type AnthropicProvider struct {
 
 func NewAnthropicProvider(apiKey string, model string) (*AnthropicProvider, error) {
 	if apiKey == "" {
-		return nil, fmt.Errorf("Anthropic API key is required")
+		return nil, fmt.Errorf("anthropic API key is required")
 	}
 
 	client := anthropic.NewClient(
