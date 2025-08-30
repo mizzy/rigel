@@ -43,6 +43,14 @@ func (p *AnthropicProvider) Generate(ctx context.Context, prompt string) (string
 }
 
 func (p *AnthropicProvider) GenerateWithOptions(ctx context.Context, prompt string, opts GenerateOptions) (string, error) {
+	// Convert single prompt to message history format
+	messages := []Message{
+		{Role: "user", Content: prompt},
+	}
+	return p.GenerateWithHistory(ctx, messages, opts)
+}
+
+func (p *AnthropicProvider) GenerateWithHistory(ctx context.Context, messages []Message, opts GenerateOptions) (string, error) {
 	model := p.model
 	if opts.Model != "" {
 		model = opts.Model
@@ -53,13 +61,19 @@ func (p *AnthropicProvider) GenerateWithOptions(ctx context.Context, prompt stri
 		maxTokens = opts.MaxTokens
 	}
 
-	messages := []anthropic.MessageParam{
-		anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
+	// Convert our Message format to Anthropic's MessageParam format
+	anthropicMessages := make([]anthropic.MessageParam, 0, len(messages))
+	for _, msg := range messages {
+		if msg.Role == "user" {
+			anthropicMessages = append(anthropicMessages, anthropic.NewUserMessage(anthropic.NewTextBlock(msg.Content)))
+		} else if msg.Role == "assistant" {
+			anthropicMessages = append(anthropicMessages, anthropic.NewAssistantMessage(anthropic.NewTextBlock(msg.Content)))
+		}
 	}
 
 	params := anthropic.MessageNewParams{
 		Model:     anthropic.F(model),
-		Messages:  anthropic.F(messages),
+		Messages:  anthropic.F(anthropicMessages),
 		MaxTokens: anthropic.F(int64(maxTokens)),
 	}
 

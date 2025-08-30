@@ -214,6 +214,16 @@ func (m *MockLLMProvider) GenerateWithOptions(ctx context.Context, prompt string
 	return m.generateResponse, nil
 }
 
+func (m *MockLLMProvider) GenerateWithHistory(ctx context.Context, messages []llm.Message, opts llm.GenerateOptions) (string, error) {
+	// For testing, just return the same response as GenerateWithOptions
+	if len(m.multiResponse) > 0 {
+		response := m.multiResponse[m.callCount%len(m.multiResponse)]
+		m.callCount++
+		return response, nil
+	}
+	return m.generateResponse, nil
+}
+
 func (m *MockLLMProvider) Stream(ctx context.Context, prompt string) (<-chan llm.StreamResponse, error) {
 	ch := make(chan llm.StreamResponse, 1)
 	go func() {

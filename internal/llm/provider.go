@@ -10,10 +10,16 @@ import (
 type Provider interface {
 	Generate(ctx context.Context, prompt string) (string, error)
 	GenerateWithOptions(ctx context.Context, prompt string, opts GenerateOptions) (string, error)
+	GenerateWithHistory(ctx context.Context, messages []Message, opts GenerateOptions) (string, error)
 	Stream(ctx context.Context, prompt string) (<-chan StreamResponse, error)
 	ListModels(ctx context.Context) ([]Model, error)
 	GetCurrentModel() string
 	SetModel(model string)
+}
+
+type Message struct {
+	Role    string `json:"role"` // "user" or "assistant"
+	Content string `json:"content"`
 }
 
 type GenerateOptions struct {

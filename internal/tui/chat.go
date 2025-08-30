@@ -10,7 +10,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mizzy/rigel/internal/config"
+	"github.com/mizzy/rigel/internal/history"
 	"github.com/mizzy/rigel/internal/llm"
+	"golang.org/x/term"
 )
 
 // ChatModel represents the main chat interface
@@ -33,6 +35,7 @@ type ChatModel struct {
 	showSuggestions    bool
 	ctrlCPressed       bool
 	infoMessage        string
+	historyManager     *history.Manager // Add history manager
 
 	// Model selection mode
 	modelSelectionMode bool
@@ -91,15 +94,33 @@ func NewChatModel(provider llm.Provider, cfg *config.Config) *ChatModel {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("87")) // Match Rigel blue
 
-	return &ChatModel{
-		provider:     provider,
-		config:       cfg,
-		input:        ta,
-		spinner:      s,
-		history:      []Exchange{},
-		inputHistory: []string{},
-		historyIndex: -1,
+	// Initialize history manager
+	histManager, err := history.NewManager()
+	if err != nil {
+		// If we can't create history manager, continue without it
+		histManager = nil
+	} else {
+		// Load existing history
+		_ = histManager.Load()
 	}
+
+	m := &ChatModel{
+		provider:       provider,
+		config:         cfg,
+		input:          ta,
+		spinner:        s,
+		history:        []Exchange{},
+		inputHistory:   []string{},
+		historyIndex:   -1,
+		historyManager: histManager,
+	}
+
+	// Load input history from manager if available
+	if histManager != nil {
+		m.inputHistory = histManager.GetCommands()
+	}
+
+	return m
 }
 
 // Init initializes the chat model
@@ -193,9 +214,36 @@ func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "enter" && !m.thinking {
 			m.ctrlCPressed = false // Reset Ctrl+C flag
 			m.infoMessage = ""
-			// If suggestions are shown and one is selected, complete it
+			// If suggestions are shown and one is selected, complete and execute it
 			if m.showSuggestions {
 				m.completeSuggestion()
+				// After completing suggestion, check if it's a command and execute it
+				if strings.HasPrefix(m.input.Value(), "/") {
+					// Treat it as if user pressed Enter with the command
+					m.currentPrompt = m.input.Value()
+
+					// Save to input history
+					m.inputHistory = append(m.inputHistory, m.currentPrompt)
+					m.historyIndex = -1
+					m.currentInput = ""
+
+					// Save to persistent history
+					if m.historyManager != nil {
+						_ = m.historyManager.Add(m.currentPrompt)
+					}
+
+					m.input.SetValue("")
+					m.thinking = true
+					m.err = nil
+					m.showSuggestions = false
+
+					// Handle the command
+					trimmedPrompt := strings.TrimSpace(m.currentPrompt)
+					cmd := m.handleCommand(trimmedPrompt)
+					if cmd != nil {
+						return m, tea.Batch(cmd, m.spinner.Tick)
+					}
+				}
 				return m, nil
 			}
 
@@ -206,6 +254,11 @@ func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.inputHistory = append(m.inputHistory, m.currentPrompt)
 				m.historyIndex = -1
 				m.currentInput = ""
+
+				// Save to persistent history
+				if m.historyManager != nil {
+					_ = m.historyManager.Add(m.currentPrompt)
+				}
 
 				m.input.SetValue("")
 				m.thinking = true
@@ -457,6 +510,16 @@ func (m *ChatModel) switchModel(modelName string) tea.Cmd {
 	}
 }
 
+// getTerminalWidth returns the current terminal width
+func getTerminalWidth() int {
+	width, _, err := term.GetSize(0)
+	if err != nil {
+		// Default to 80 columns if we can't get terminal size
+		return 80
+	}
+	return width
+}
+
 // View renders the chat interface
 func (m ChatModel) View() string {
 	if m.quitting {
@@ -465,16 +528,24 @@ func (m ChatModel) View() string {
 
 	var s strings.Builder
 
-	// Display history
+	// Get terminal width and calculate usable widths
+	termWidth := getTerminalWidth()
+	promptWidth := termWidth - 3 // Account for prompt symbol and space
+	responseWidth := termWidth - 2
+
 	for _, ex := range m.history {
 		// User prompt with > symbol
 		s.WriteString(promptSymbol)
 		s.WriteString(" ")
-		s.WriteString(inputStyle.Render(ex.Prompt))
+
+		// Use lipgloss Width() for proper wrapping
+		promptStyle := inputStyle.Width(promptWidth)
+		s.WriteString(promptStyle.Render(ex.Prompt))
 		s.WriteString("\n\n")
 
-		// Assistant response
-		s.WriteString(outputStyle.Render(ex.Response))
+		// Assistant response with wrapping
+		responseStyle := outputStyle.Width(responseWidth)
+		s.WriteString(responseStyle.Render(ex.Response))
 		s.WriteString("\n\n")
 	}
 
@@ -563,7 +634,10 @@ func (m ChatModel) View() string {
 	if m.thinking && m.currentPrompt != "" {
 		s.WriteString(promptSymbol)
 		s.WriteString(" ")
-		s.WriteString(inputStyle.Render(m.currentPrompt))
+
+		// Use lipgloss Width() for proper wrapping
+		promptStyle := inputStyle.Width(promptWidth)
+		s.WriteString(promptStyle.Render(m.currentPrompt))
 		s.WriteString("\n\n")
 		s.WriteString(m.spinner.View())
 		s.WriteString(thinkingStyle.Render(" Thinking..."))
@@ -622,11 +696,34 @@ func (m ChatModel) View() string {
 	return s.String()
 }
 
-// requestResponse sends a request to the LLM provider
+// requestResponse sends a request to the LLM provider with conversation history
 func (m *ChatModel) requestResponse(prompt string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		response, err := m.provider.Generate(ctx, prompt)
+
+		// Build message history from chat exchanges
+		messages := make([]llm.Message, 0, len(m.history)*2+1)
+
+		// Add previous exchanges to maintain context
+		for _, exchange := range m.history {
+			messages = append(messages, llm.Message{
+				Role:    "user",
+				Content: exchange.Prompt,
+			})
+			messages = append(messages, llm.Message{
+				Role:    "assistant",
+				Content: exchange.Response,
+			})
+		}
+
+		// Add current prompt
+		messages = append(messages, llm.Message{
+			Role:    "user",
+			Content: prompt,
+		})
+
+		// Use GenerateWithHistory to send full conversation context
+		response, err := m.provider.GenerateWithHistory(ctx, messages, llm.GenerateOptions{})
 		if err != nil {
 			return aiResponse{err: err}
 		}

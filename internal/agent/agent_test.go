@@ -26,6 +26,11 @@ func (m *MockProvider) GenerateWithOptions(ctx context.Context, prompt string, o
 	return args.String(0), args.Error(1)
 }
 
+func (m *MockProvider) GenerateWithHistory(ctx context.Context, messages []llm.Message, opts llm.GenerateOptions) (string, error) {
+	args := m.Called(ctx, messages, opts)
+	return args.String(0), args.Error(1)
+}
+
 func (m *MockProvider) Stream(ctx context.Context, prompt string) (<-chan llm.StreamResponse, error) {
 	args := m.Called(ctx, prompt)
 	if ch := args.Get(0); ch != nil {

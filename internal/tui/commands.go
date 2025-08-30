@@ -21,6 +21,7 @@ var availableCommands = []struct {
 	{"/provider", "Switch between LLM providers (Anthropic, Ollama, etc.)"},
 	{"/help", "Show available commands"},
 	{"/clear", "Clear chat history"},
+	{"/clearhistory", "Clear command history"},
 	{"/exit", "Exit the application"},
 	{"/quit", "Exit the application"},
 }
@@ -44,6 +45,9 @@ func (m *ChatModel) handleCommand(trimmedPrompt string) tea.Cmd {
 		m.history = []Exchange{}
 		m.thinking = false
 		return nil
+
+	case "/clearhistory":
+		return m.clearHistory()
 
 	case "/exit", "/quit":
 		m.quitting = true
@@ -154,6 +158,29 @@ func (m *ChatModel) showProviderSelector() tea.Cmd {
 		return providerSelectorMsg{
 			currentProvider: currentProvider,
 			providers:       providers,
+		}
+	}
+}
+
+// clearHistory clears the command history
+func (m *ChatModel) clearHistory() tea.Cmd {
+	return func() tea.Msg {
+		// Clear in-memory history
+		m.inputHistory = []string{}
+		m.historyIndex = -1
+		m.currentInput = ""
+
+		// Clear persistent history
+		if m.historyManager != nil {
+			if err := m.historyManager.Clear(); err != nil {
+				return aiResponse{
+					err: fmt.Errorf("failed to clear history: %w", err),
+				}
+			}
+		}
+
+		return aiResponse{
+			content: "Command history cleared successfully.",
 		}
 	}
 }
