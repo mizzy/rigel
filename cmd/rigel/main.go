@@ -5,16 +5,22 @@ import (
 	"io"
 	"log"
 	"os"
+	"runtime"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/llm"
+	"github.com/mizzy/rigel/internal/sandbox"
 	"github.com/mizzy/rigel/internal/tui"
 	"github.com/spf13/cobra"
 )
 
-var cfg *config.Config
+var (
+	cfg           *config.Config
+	sandboxFlag   bool
+	noSandboxFlag bool
+)
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -28,6 +34,23 @@ var rootCmd = &cobra.Command{
 	Long: `Rigel is an AI-powered coding assistant that helps developers write,
 review, and improve code through natural language interactions.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Handle sandbox mode (default enabled on macOS)
+		if !noSandboxFlag && (sandboxFlag || shouldEnableSandboxByDefault()) {
+			if !sandbox.IsSandboxed() {
+				if err := sandbox.EnableSandbox("."); err != nil {
+					log.Printf("Warning: Failed to enable sandbox: %v", err)
+					log.Println("Running without sandbox restrictions.")
+				}
+				// If EnableSandbox succeeds, it will re-exec and exit
+			}
+		}
+
+		// Show sandbox status
+		if sandbox.IsSandboxed() {
+			fmt.Fprintln(os.Stderr, "🔒 Sandbox enabled: File writes restricted to current directory")
+		} else if noSandboxFlag {
+			fmt.Fprintln(os.Stderr, "⚠️  Running without sandbox. File operations are unrestricted.")
+		}
 		var err error
 		cfg, err = config.Load("")
 		if err != nil {
@@ -84,5 +107,12 @@ func runChatMode(provider llm.Provider) {
 }
 
 func init() {
-	// No flags needed - inline mode is now the default and only mode
+	rootCmd.Flags().BoolVar(&sandboxFlag, "sandbox", false, "Force enable sandbox mode (default on macOS)")
+	rootCmd.Flags().BoolVar(&noSandboxFlag, "no-sandbox", false, "Disable sandbox mode explicitly")
+}
+
+func shouldEnableSandboxByDefault() bool {
+	// Enable sandbox by default on macOS
+	// Can be expanded to other platforms in the future
+	return runtime.GOOS == "darwin"
 }
