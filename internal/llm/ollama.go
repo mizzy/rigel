@@ -74,8 +74,18 @@ func (p *OllamaProvider) GenerateWithOptions(ctx context.Context, prompt string,
 		Stream: false,
 	}
 
-	if opts.SystemPrompt != "" {
-		reqBody.System = opts.SystemPrompt
+	// Include AGENTS.md content in the system prompt
+	systemPrompt := opts.SystemPrompt
+	if systemPrompt == "" {
+		// Load AGENTS.md even if no system prompt is provided
+		systemPrompt = PrependAgentsContext("")
+	} else {
+		// Prepend AGENTS.md to existing system prompt
+		systemPrompt = PrependAgentsContext(systemPrompt)
+	}
+
+	if systemPrompt != "" {
+		reqBody.System = systemPrompt
 	}
 
 	if opts.Temperature > 0 {
