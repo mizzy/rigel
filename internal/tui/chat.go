@@ -9,33 +9,11 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mizzy/rigel/internal/analyzer"
 	"github.com/mizzy/rigel/internal/llm"
 )
 
-// Rigel-inspired color scheme (blue-white star)
-var (
-	promptSymbol    = lipgloss.NewStyle().Foreground(lipgloss.Color("87")).Bold(true).Render("✦") // Light blue star symbol
-	inputStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("195"))                       // Very light blue-white
-	outputStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	thinkingStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("117")).Italic(true) // Soft blue
-	suggestionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))              // Gray for suggestions
-	highlightStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("87")).Bold(true)    // Highlighted suggestion
-)
-
-// Available commands
-var availableCommands = []struct {
-	command     string
-	description string
-}{
-	{"/init", "Analyze repository and generate AGENTS.md"},
-	{"/help", "Show available commands"},
-	{"/clear", "Clear chat history"},
-	{"/exit", "Exit the application"},
-	{"/quit", "Exit the application"},
-}
-
-type SimpleModel struct {
+// ChatModel represents the main chat interface
+type ChatModel struct {
 	provider llm.Provider
 	input    textarea.Model
 	spinner  spinner.Model
@@ -52,12 +30,14 @@ type SimpleModel struct {
 	infoMessage        string
 }
 
+// Exchange represents a single chat exchange
 type Exchange struct {
 	Prompt   string
 	Response string
 }
 
-func NewSimpleModel(provider llm.Provider) *SimpleModel {
+// NewChatModel creates a new chat model instance
+func NewChatModel(provider llm.Provider) *ChatModel {
 	ta := textarea.New()
 	ta.Placeholder = "Type a message or / for commands (Alt+Enter for new line)"
 	ta.Focus()
@@ -94,7 +74,7 @@ func NewSimpleModel(provider llm.Provider) *SimpleModel {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("87")) // Match Rigel blue
 
-	return &SimpleModel{
+	return &ChatModel{
 		provider: provider,
 		input:    ta,
 		spinner:  s,
@@ -102,19 +82,16 @@ func NewSimpleModel(provider llm.Provider) *SimpleModel {
 	}
 }
 
-func (m SimpleModel) Init() tea.Cmd {
+// Init initializes the chat model
+func (m ChatModel) Init() tea.Cmd {
 	return tea.Batch(
 		textarea.Blink,
 		m.spinner.Tick,
 	)
 }
 
-type aiResponse struct {
-	content string
-	err     error
-}
-
-func (m SimpleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update handles messages and updates the model
+func (m ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
@@ -193,31 +170,9 @@ func (m SimpleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				// Handle commands
 				trimmedPrompt := strings.TrimSpace(m.currentPrompt)
-				switch trimmedPrompt {
-				case "/init":
-					return m, tea.Batch(
-						m.analyzeRepository(),
-						m.spinner.Tick,
-					)
-				case "/help":
-					return m, m.showHelp()
-				case "/clear":
-					m.history = []Exchange{}
-					m.thinking = false
-					return m, nil
-				case "/exit", "/quit":
-					m.quitting = true
-					return m, tea.Quit
-				default:
-					if strings.HasPrefix(trimmedPrompt, "/") {
-						m.err = fmt.Errorf("unknown command: %s, type /help for available commands", trimmedPrompt)
-						m.thinking = false
-						return m, nil
-					}
-					return m, tea.Batch(
-						m.requestResponse(m.currentPrompt),
-						m.spinner.Tick,
-					)
+				cmd := m.handleCommand(trimmedPrompt)
+				if cmd != nil {
+					return m, tea.Batch(cmd, m.spinner.Tick)
 				}
 			}
 			return m, nil
@@ -267,7 +222,8 @@ func (m SimpleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m SimpleModel) View() string {
+// View renders the chat interface
+func (m ChatModel) View() string {
 	if m.quitting {
 		return ""
 	}
@@ -362,7 +318,8 @@ func (m SimpleModel) View() string {
 	return s.String()
 }
 
-func (m *SimpleModel) requestResponse(prompt string) tea.Cmd {
+// requestResponse sends a request to the LLM provider
+func (m *ChatModel) requestResponse(prompt string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		response, err := m.provider.Generate(ctx, prompt)
@@ -373,77 +330,16 @@ func (m *SimpleModel) requestResponse(prompt string) tea.Cmd {
 	}
 }
 
-func (m *SimpleModel) updateSuggestions() {
-	value := m.input.Value()
-	m.suggestions = []string{}
-	m.showSuggestions = false
-	m.selectedSuggestion = 0
-
-	// Check if the input starts with /
-	if strings.HasPrefix(value, "/") {
-		prefix := strings.ToLower(value)
-		for _, cmd := range availableCommands {
-			if strings.HasPrefix(strings.ToLower(cmd.command), prefix) {
-				m.suggestions = append(m.suggestions, cmd.command)
-			}
-		}
-		if len(m.suggestions) > 0 && value != m.suggestions[0] {
-			m.showSuggestions = true
-		}
-	}
+// aiResponse represents a response from the AI
+type aiResponse struct {
+	content string
+	err     error
 }
 
-func (m *SimpleModel) completeSuggestion() {
-	if m.showSuggestions && m.selectedSuggestion < len(m.suggestions) {
-		m.input.SetValue(m.suggestions[m.selectedSuggestion])
-		m.input.CursorEnd()
-		m.showSuggestions = false
-		m.suggestions = []string{}
-	}
+// NewSimpleModel is an alias for NewChatModel for backward compatibility
+func NewSimpleModel(provider llm.Provider) *ChatModel {
+	return NewChatModel(provider)
 }
 
-func (m *SimpleModel) showHelp() tea.Cmd {
-	return func() tea.Msg {
-		var help strings.Builder
-		help.WriteString("Available commands:\n\n")
-		for _, cmd := range availableCommands {
-			help.WriteString(fmt.Sprintf("  %s - %s\n", cmd.command, cmd.description))
-		}
-		help.WriteString("\nKeyboard shortcuts:\n")
-		help.WriteString("  Tab       - Complete command\n")
-		help.WriteString("  ↑/↓       - Navigate suggestions\n")
-		help.WriteString("  Enter     - Send message or select suggestion\n")
-		help.WriteString("  Alt+Enter - New line\n")
-		help.WriteString("  Ctrl+C    - Exit\n")
-
-		return aiResponse{
-			content: help.String(),
-		}
-	}
-}
-
-func (m *SimpleModel) analyzeRepository() tea.Cmd {
-	return func() tea.Msg {
-		// Analyze the repository and generate AGENTS.md
-		analyzer := analyzer.NewRepoAnalyzer(m.provider)
-		content, err := analyzer.Analyze()
-		if err != nil {
-			return aiResponse{err: err}
-		}
-
-		// Write the AGENTS.md file
-		err = analyzer.WriteAgentsFile(content)
-		if err != nil {
-			return aiResponse{err: err}
-		}
-
-		return aiResponse{
-			content: "✅ Repository analyzed successfully! AGENTS.md has been created.\n\n" +
-				"The file contains:\n" +
-				"• Repository structure and overview\n" +
-				"• Key components and their responsibilities\n" +
-				"• File purposes and dependencies\n" +
-				"• Testing and configuration information",
-		}
-	}
-}
+// SimpleModel is an alias for ChatModel for backward compatibility
+type SimpleModel = ChatModel
