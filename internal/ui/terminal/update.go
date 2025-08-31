@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mizzy/rigel/internal/command"
+	"github.com/mizzy/rigel/internal/ui/handlers"
 )
 
 // Update handles incoming messages and returns updated application state
@@ -190,7 +191,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case providerSelectorMsg:
 		if msg.err != nil {
 			return m, func() tea.Msg {
-				return aiResponse{err: msg.err}
+				return handlers.AIResponse{Error: msg.err}
 			}
 		}
 
@@ -200,7 +201,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case modelSelectorMsg:
 		if msg.err != nil {
 			return m, func() tea.Msg {
-				return aiResponse{err: msg.err}
+				return handlers.AIResponse{Error: msg.err}
 			}
 		}
 
@@ -225,7 +226,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.chatState.ClearCurrentPrompt()
 			case "request":
 				// Handle normal prompts (non-commands)
-				return m, m.requestResponse(msg.Prompt)
+				return m, handlers.RequestResponse(msg.Prompt, m.llmState, m.chatState)
 			case "model_selector":
 				if msg.ModelSelector != nil {
 					return m, func() tea.Msg { return *msg.ModelSelector }
@@ -256,7 +257,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case command.ModelSelectorMsg:
 		if msg.Error != nil {
 			return m, func() tea.Msg {
-				return aiResponse{err: msg.Error}
+				return handlers.AIResponse{Error: msg.Error}
 			}
 		}
 
@@ -308,13 +309,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.chatState.ClearCurrentPrompt()
 		return m, nil
 
-	case aiResponse:
+	case handlers.AIResponse:
 		m.chatState.SetThinking(false)
 
-		if msg.err != nil {
-			m.chatState.SetError(msg.err)
+		if msg.Error != nil {
+			m.chatState.SetError(msg.Error)
 		} else {
-			m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), msg.content)
+			m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), msg.Content)
 			m.chatState.ClearCurrentPrompt()
 		}
 		return m, nil

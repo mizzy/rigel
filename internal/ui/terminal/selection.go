@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mizzy/rigel/internal/llm"
+	"github.com/mizzy/rigel/internal/ui/handlers"
 )
 
 func (m *Model) handleProviderSelectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -122,8 +123,8 @@ func (m *Model) switchModel(model llm.Model) tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		return aiResponse{
-			content: fmt.Sprintf("Switched to model: %s", model.Name),
+		return handlers.AIResponse{
+			Content: fmt.Sprintf("Switched to model: %s", model.Name),
 		}
 	}
 }
