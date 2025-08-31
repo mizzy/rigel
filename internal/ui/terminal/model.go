@@ -5,7 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mizzy/rigel/internal/completion"
+	"github.com/mizzy/rigel/internal/command"
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/history"
 	"github.com/mizzy/rigel/internal/llm"
@@ -46,7 +46,8 @@ type Model struct {
 	selectedProviderIndex int
 
 	// Handlers
-	completionHandler *completion.Handler
+	completionHandler *command.CompletionHandler
+	commandHandler    *command.Handler
 }
 
 // Exchange represents a single chat exchange
@@ -112,7 +113,8 @@ func NewModel(provider llm.Provider, cfg *config.Config) *Model {
 		inputHistory:      []string{},
 		historyIndex:      -1,
 		historyManager:    histManager,
-		completionHandler: completion.NewHandler(),
+		completionHandler: command.NewCompletionHandler(),
+		commandHandler:    command.NewHandler(),
 	}
 
 	// Load input history from manager if available

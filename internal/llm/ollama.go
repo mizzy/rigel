@@ -251,8 +251,17 @@ func (p *OllamaProvider) Stream(ctx context.Context, prompt string) (<-chan Stre
 	return ch, nil
 }
 
+type ollamaModel struct {
+	Name       string       `json:"name"`
+	Model      string       `json:"model"`
+	Size       int64        `json:"size"`
+	Digest     string       `json:"digest"`
+	ModifiedAt string       `json:"modified_at"`
+	Details    ModelDetails `json:"details"`
+}
+
 type ollamaListResponse struct {
-	Models []Model `json:"models"`
+	Models []ollamaModel `json:"models"`
 }
 
 func (p *OllamaProvider) ListModels(ctx context.Context) ([]Model, error) {
@@ -282,7 +291,19 @@ func (p *OllamaProvider) ListModels(ctx context.Context) ([]Model, error) {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	return listResp.Models, nil
+	// Convert ollamaModel to Model
+	models := make([]Model, len(listResp.Models))
+	for i, om := range listResp.Models {
+		models[i] = Model{
+			Name:       om.Model, // Use 'model' field as Name
+			Size:       om.Size,
+			Digest:     om.Digest,
+			ModifiedAt: om.ModifiedAt,
+			Details:    om.Details,
+		}
+	}
+
+	return models, nil
 }
 
 func (p *OllamaProvider) GetCurrentModel() string {

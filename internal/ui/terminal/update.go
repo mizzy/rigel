@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mizzy/rigel/internal/command"
 )
 
 // Update handles incoming messages and returns updated application state
@@ -128,7 +129,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					// Handle the command
 					trimmedPrompt := strings.TrimSpace(m.currentPrompt)
-					cmd := m.handleCommand(trimmedPrompt)
+					result := m.commandHandler.HandleCommand(trimmedPrompt, &m)
+					cmd := m.convertCommandResultToCmd(result)
 					if cmd != nil {
 						return m, tea.Batch(cmd, m.spinner.Tick)
 					}
@@ -156,7 +158,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				// Handle commands
 				trimmedPrompt := strings.TrimSpace(m.currentPrompt)
-				cmd := m.handleCommand(trimmedPrompt)
+				result := m.commandHandler.HandleCommand(trimmedPrompt, &m)
+				cmd := m.convertCommandResultToCmd(result)
 				if cmd != nil {
 					return m, tea.Batch(cmd, m.spinner.Tick)
 				}
@@ -222,6 +225,84 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.input.SetValue("")
 		m.input.Placeholder = "Type to filter models, Enter to select, Esc to cancel"
 
+		return m, nil
+
+	case command.Result:
+		m.thinking = false
+		if msg.Error != nil {
+			m.err = msg.Error
+		} else if msg.Content != "" {
+			m.history = append(m.history, Exchange{
+				Prompt:   m.currentPrompt,
+				Response: msg.Content,
+			})
+			m.currentPrompt = ""
+		}
+		return m, nil
+
+	case command.ModelSelectorMsg:
+		if msg.Error != nil {
+			return m, func() tea.Msg {
+				return aiResponse{err: msg.Error}
+			}
+		}
+
+		m.modelSelectionMode = true
+		m.availableModels = msg.Models
+		m.filteredModels = msg.Models
+		m.selectedModelIndex = 0
+		m.modelFilter = ""
+		m.input.SetValue("")
+		m.input.Placeholder = "Type to filter models, Enter to select, Esc to cancel"
+
+		return m, nil
+
+	case command.ProviderSelectorMsg:
+		m.providerSelectionMode = true
+		m.availableProviders = msg.Providers
+		m.selectedProviderIndex = 0
+
+		// Find current provider index
+		for i, p := range msg.Providers {
+			if p == msg.CurrentProvider {
+				m.selectedProviderIndex = i
+				break
+			}
+		}
+
+		return m, nil
+
+	case command.StatusInfo:
+		m.thinking = false
+		// Convert StatusInfo to formatted string and display it
+		statusContent := fmt.Sprintf("✦ Rigel Session Status\n\n"+
+			"🤖 LLM Configuration\n"+
+			"  Provider: %s\n"+
+			"  Model: %s\n\n"+
+			"💬 Chat History\n"+
+			"  Messages: %d\n"+
+			"  User tokens: ~%d\n"+
+			"  Assistant tokens: ~%d\n"+
+			"  Total tokens: ~%d\n\n"+
+			"📝 Command History\n"+
+			"  Commands saved: %d\n"+
+			"  Persistence: %s\n\n"+
+			"🔧 Environment\n"+
+			"  Log level: %s\n"+
+			"  Repository context: %s\n",
+			msg.Provider, msg.Model,
+			msg.MessageCount,
+			msg.UserTokens, msg.AssistantTokens, msg.TotalTokens,
+			msg.CommandsCount,
+			map[bool]string{true: "✓ Enabled", false: "✗ Disabled"}[msg.PersistenceEnabled],
+			msg.LogLevel,
+			map[bool]string{true: "✓ AGENTS.md loaded", false: "✗ Not initialized (run /init)"}[msg.RepositoryInitialized])
+
+		m.history = append(m.history, Exchange{
+			Prompt:   m.currentPrompt,
+			Response: statusContent,
+		})
+		m.currentPrompt = ""
 		return m, nil
 
 	case providerSwitchResponse:
