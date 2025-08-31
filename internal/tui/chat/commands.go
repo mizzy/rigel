@@ -1,4 +1,4 @@
-package tui
+package chat
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mizzy/rigel/internal/analyzer"
-	"github.com/mizzy/rigel/internal/llm"
+	"github.com/mizzy/rigel/internal/tui/styles"
 )
 
 // Available commands
@@ -29,7 +29,7 @@ var availableCommands = []struct {
 }
 
 // handleCommand processes commands and returns the appropriate tea.Cmd
-func (m *ChatModel) handleCommand(trimmedPrompt string) tea.Cmd {
+func (m *Model) handleCommand(trimmedPrompt string) tea.Cmd {
 	switch trimmedPrompt {
 	case "/init":
 		return m.analyzeRepository()
@@ -69,7 +69,7 @@ func (m *ChatModel) handleCommand(trimmedPrompt string) tea.Cmd {
 }
 
 // showHelp displays the help message
-func (m *ChatModel) showHelp() tea.Cmd {
+func (m *Model) showHelp() tea.Cmd {
 	return func() tea.Msg {
 		var help strings.Builder
 		help.WriteString("Available commands:\n\n")
@@ -90,7 +90,7 @@ func (m *ChatModel) showHelp() tea.Cmd {
 }
 
 // analyzeRepository runs the repository analysis
-func (m *ChatModel) analyzeRepository() tea.Cmd {
+func (m *Model) analyzeRepository() tea.Cmd {
 	return func() tea.Msg {
 		// Analyze the repository and generate AGENTS.md
 		analyzer := analyzer.NewRepoAnalyzer(m.provider)
@@ -116,13 +116,7 @@ func (m *ChatModel) analyzeRepository() tea.Cmd {
 	}
 }
 
-type modelSelectorMsg struct {
-	currentModel string
-	models       []llm.Model
-	err          error
-}
-
-func (m *ChatModel) showModelSelector() tea.Cmd {
+func (m *Model) showModelSelector() tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -143,13 +137,7 @@ func (m *ChatModel) showModelSelector() tea.Cmd {
 	}
 }
 
-type providerSelectorMsg struct {
-	currentProvider string
-	providers       []string
-	err             error
-}
-
-func (m *ChatModel) showProviderSelector() tea.Cmd {
+func (m *Model) showProviderSelector() tea.Cmd {
 	return func() tea.Msg {
 		// Get available providers
 		providers := []string{"anthropic", "ollama"}
@@ -168,45 +156,45 @@ func (m *ChatModel) showProviderSelector() tea.Cmd {
 }
 
 // showStatus displays the current session status and configuration
-func (m *ChatModel) showStatus() tea.Cmd {
+func (m *Model) showStatus() tea.Cmd {
 	return func() tea.Msg {
 		var status strings.Builder
 
 		// Header
-		status.WriteString(statusHeaderStyle.Render("✦ Rigel Session Status"))
+		status.WriteString(styles.StatusHeaderStyle.Render("✦ Rigel Session Status"))
 		status.WriteString("\n")
 
 		// Create a full-width divider
-		dividerLine := strings.Repeat(statusDivider, 50)
+		dividerLine := strings.Repeat(styles.StatusDivider, 50)
 		status.WriteString(dividerLine)
 		status.WriteString("\n\n")
 
 		// LLM Configuration Section
-		status.WriteString(statusHeaderStyle.Render("🤖 LLM Configuration"))
+		status.WriteString(styles.StatusHeaderStyle.Render("🤖 LLM Configuration"))
 		status.WriteString("\n")
 		if m.config != nil {
 			status.WriteString(fmt.Sprintf("  %s %s\n",
-				statusLabelStyle.Render("Provider:"),
-				statusValueStyle.Bold(true).Render(m.config.Provider)))
+				styles.StatusLabelStyle.Render("Provider:"),
+				styles.StatusValueStyle.Bold(true).Render(m.config.Provider)))
 		}
 		if m.provider != nil {
 			status.WriteString(fmt.Sprintf("  %s %s\n",
-				statusLabelStyle.Render("Model:"),
-				statusValueStyle.Bold(true).Render(m.provider.GetCurrentModel())))
+				styles.StatusLabelStyle.Render("Model:"),
+				styles.StatusValueStyle.Bold(true).Render(m.provider.GetCurrentModel())))
 		}
 		status.WriteString("\n")
 
 		// Chat History Section
-		status.WriteString(statusHeaderStyle.Render("💬 Chat History"))
+		status.WriteString(styles.StatusHeaderStyle.Render("💬 Chat History"))
 		status.WriteString("\n")
 
 		messageCount := len(m.history)
-		messageStyle := statusValueStyle
+		messageStyle := styles.StatusValueStyle
 		if messageCount > 100 {
-			messageStyle = statusWarningStyle
+			messageStyle = styles.StatusWarningStyle
 		}
 		status.WriteString(fmt.Sprintf("  %s %s\n",
-			statusLabelStyle.Render("Messages:"),
+			styles.StatusLabelStyle.Render("Messages:"),
 			messageStyle.Render(fmt.Sprintf("%d", messageCount))))
 
 		// Calculate token usage
@@ -221,68 +209,68 @@ func (m *ChatModel) showStatus() tea.Cmd {
 		totalTokens := approxUserTokens + approxAssistantTokens
 
 		// Color code token counts
-		tokenStyle := statusValueStyle
+		tokenStyle := styles.StatusValueStyle
 		if totalTokens > 50000 {
-			tokenStyle = statusDangerStyle
+			tokenStyle = styles.StatusDangerStyle
 		} else if totalTokens > 25000 {
-			tokenStyle = statusWarningStyle
+			tokenStyle = styles.StatusWarningStyle
 		}
 
 		status.WriteString(fmt.Sprintf("  %s %s\n",
-			statusLabelStyle.Render("User tokens:"),
-			statusValueStyle.Render(fmt.Sprintf("~%d", approxUserTokens))))
+			styles.StatusLabelStyle.Render("User tokens:"),
+			styles.StatusValueStyle.Render(fmt.Sprintf("~%d", approxUserTokens))))
 		status.WriteString(fmt.Sprintf("  %s %s\n",
-			statusLabelStyle.Render("Assistant tokens:"),
-			statusValueStyle.Render(fmt.Sprintf("~%d", approxAssistantTokens))))
+			styles.StatusLabelStyle.Render("Assistant tokens:"),
+			styles.StatusValueStyle.Render(fmt.Sprintf("~%d", approxAssistantTokens))))
 		status.WriteString(fmt.Sprintf("  %s %s\n",
-			statusLabelStyle.Render("Total tokens:"),
+			styles.StatusLabelStyle.Render("Total tokens:"),
 			tokenStyle.Bold(true).Render(fmt.Sprintf("~%d", totalTokens))))
 		status.WriteString("\n")
 
 		// Command History Section
-		status.WriteString(statusHeaderStyle.Render("📝 Command History"))
+		status.WriteString(styles.StatusHeaderStyle.Render("📝 Command History"))
 		status.WriteString("\n")
 		status.WriteString(fmt.Sprintf("  %s %s\n",
-			statusLabelStyle.Render("Commands saved:"),
-			statusValueStyle.Render(fmt.Sprintf("%d", len(m.inputHistory)))))
+			styles.StatusLabelStyle.Render("Commands saved:"),
+			styles.StatusValueStyle.Render(fmt.Sprintf("%d", len(m.inputHistory)))))
 
 		if m.historyManager != nil {
 			status.WriteString(fmt.Sprintf("  %s %s\n",
-				statusLabelStyle.Render("Persistence:"),
-				statusSuccessStyle.Render("✓ Enabled")))
+				styles.StatusLabelStyle.Render("Persistence:"),
+				styles.StatusSuccessStyle.Render("✓ Enabled")))
 		} else {
 			status.WriteString(fmt.Sprintf("  %s %s\n",
-				statusLabelStyle.Render("Persistence:"),
-				statusWarningStyle.Render("✗ Disabled")))
+				styles.StatusLabelStyle.Render("Persistence:"),
+				styles.StatusWarningStyle.Render("✗ Disabled")))
 		}
 		status.WriteString("\n")
 
 		// Environment Section
-		status.WriteString(statusHeaderStyle.Render("🔧 Environment"))
+		status.WriteString(styles.StatusHeaderStyle.Render("🔧 Environment"))
 		status.WriteString("\n")
 
 		if m.config != nil && m.config.LogLevel != "" {
 			status.WriteString(fmt.Sprintf("  %s %s\n",
-				statusLabelStyle.Render("Log level:"),
-				statusValueStyle.Render(m.config.LogLevel)))
+				styles.StatusLabelStyle.Render("Log level:"),
+				styles.StatusValueStyle.Render(m.config.LogLevel)))
 		}
 
 		// Repository context
 		if _, err := os.Stat("AGENTS.md"); err == nil {
 			status.WriteString(fmt.Sprintf("  %s %s\n",
-				statusLabelStyle.Render("Repository context:"),
-				statusSuccessStyle.Render("✓ AGENTS.md loaded")))
+				styles.StatusLabelStyle.Render("Repository context:"),
+				styles.StatusSuccessStyle.Render("✓ AGENTS.md loaded")))
 		} else {
 			status.WriteString(fmt.Sprintf("  %s %s\n",
-				statusLabelStyle.Render("Repository context:"),
-				statusWarningStyle.Render("✗ Not initialized (run /init)")))
+				styles.StatusLabelStyle.Render("Repository context:"),
+				styles.StatusWarningStyle.Render("✗ Not initialized (run /init)")))
 		}
 		status.WriteString("\n")
 
 		// Footer with hints
 		status.WriteString(dividerLine)
 		status.WriteString("\n")
-		status.WriteString(statusLabelStyle.Italic(true).Render("Tip: Use /help to see all available commands"))
+		status.WriteString(styles.StatusLabelStyle.Italic(true).Render("Tip: Use /help to see all available commands"))
 
 		return aiResponse{
 			content: status.String(),
@@ -291,7 +279,7 @@ func (m *ChatModel) showStatus() tea.Cmd {
 }
 
 // clearHistory clears the command history
-func (m *ChatModel) clearHistory() tea.Cmd {
+func (m *Model) clearHistory() tea.Cmd {
 	return func() tea.Msg {
 		// Clear in-memory history
 		m.inputHistory = []string{}
