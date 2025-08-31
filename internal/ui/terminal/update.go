@@ -214,19 +214,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.chatState.SetThinking(false)
 		if msg.Error != nil {
 			m.chatState.SetError(msg.Error)
-		} else if msg.Type == "clear_input_history" {
-			// Clear input history
-			m.inputHistory = []string{}
-			m.historyIndex = -1
-			m.currentInput = ""
-			m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), "Command history cleared successfully.")
-			m.chatState.ClearCurrentPrompt()
-		} else if msg.Type == "request" {
-			// Handle normal prompts (non-commands)
-			return m, m.requestResponse(msg.Prompt)
-		} else if msg.Content != "" {
-			m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), msg.Content)
-			m.chatState.ClearCurrentPrompt()
+		} else {
+			switch msg.Type {
+			case "clear_input_history":
+				// Clear input history
+				m.inputHistory = []string{}
+				m.historyIndex = -1
+				m.currentInput = ""
+				m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), "Command history cleared successfully.")
+				m.chatState.ClearCurrentPrompt()
+			case "request":
+				// Handle normal prompts (non-commands)
+				return m, m.requestResponse(msg.Prompt)
+			case "model_selector":
+				if msg.ModelSelector != nil {
+					return m, func() tea.Msg { return *msg.ModelSelector }
+				}
+			case "provider_selector":
+				if msg.ProviderSelector != nil {
+					return m, func() tea.Msg { return *msg.ProviderSelector }
+				}
+			case "status":
+				if msg.StatusInfo != nil {
+					return m, func() tea.Msg { return *msg.StatusInfo }
+				}
+			case "quit":
+				m.quitting = true
+				return m, tea.Quit
+			case "clear":
+				// Clear handled above by SetThinking(false)
+				return m, nil
+			default:
+				if msg.Content != "" {
+					m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), msg.Content)
+					m.chatState.ClearCurrentPrompt()
+				}
+			}
 		}
 		return m, nil
 
