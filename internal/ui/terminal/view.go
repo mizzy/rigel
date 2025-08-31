@@ -3,7 +3,7 @@ package terminal
 import (
 	"strings"
 
-	"github.com/mizzy/rigel/internal/completion"
+	"github.com/mizzy/rigel/internal/command"
 	"github.com/mizzy/rigel/internal/ui/render"
 )
 
@@ -47,8 +47,8 @@ func (m Model) View() string {
 		// Display command completions using render function
 		if m.showCompletions && len(m.completions) > 0 {
 			// Convert commands to render.Command format
-			renderCommands := make([]render.Command, len(completion.AvailableCommands))
-			for i, cmd := range completion.AvailableCommands {
+			renderCommands := make([]render.Command, len(command.AvailableCommands))
+			for i, cmd := range command.AvailableCommands {
 				renderCommands[i] = render.Command{
 					Command:     cmd.Command,
 					Description: cmd.Description,

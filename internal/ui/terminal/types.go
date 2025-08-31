@@ -16,9 +16,8 @@ type providerSwitchResponse struct {
 
 // modelSelectorMsg is sent when model selection is requested
 type modelSelectorMsg struct {
-	models       []llm.Model
-	currentModel string
-	err          error
+	models []llm.Model
+	err    error
 }
 
 // providerSelectorMsg is sent when provider selection is requested
