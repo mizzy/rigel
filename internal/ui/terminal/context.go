@@ -60,7 +60,7 @@ func (m *Model) GetStatusInfo() command.StatusInfo {
 	// Calculate token usage
 	totalUserChars := 0
 	totalAssistantChars := 0
-	for _, exchange := range m.history {
+	for _, exchange := range m.chatState.GetHistory() {
 		totalUserChars += len(exchange.Prompt)
 		totalAssistantChars += len(exchange.Response)
 	}
@@ -77,7 +77,7 @@ func (m *Model) GetStatusInfo() command.StatusInfo {
 	return command.StatusInfo{
 		Provider:              provider,
 		Model:                 model,
-		MessageCount:          len(m.history),
+		MessageCount:          m.chatState.GetMessageCount(),
 		UserTokens:            approxUserTokens,
 		AssistantTokens:       approxAssistantTokens,
 		TotalTokens:           totalTokens,
@@ -89,7 +89,7 @@ func (m *Model) GetStatusInfo() command.StatusInfo {
 }
 
 func (m *Model) ClearChatHistory() {
-	m.history = []Exchange{}
+	m.chatState.ClearHistory()
 }
 
 func (m *Model) ClearInputHistory() {

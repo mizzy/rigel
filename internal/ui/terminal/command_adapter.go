@@ -39,7 +39,7 @@ func (m *Model) convertCommandResultToCmd(result command.Result) tea.Cmd {
 		return tea.Quit
 
 	case "clear":
-		m.thinking = false
+		m.chatState.SetThinking(false)
 		return nil
 
 	case "request":

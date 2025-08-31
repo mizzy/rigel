@@ -84,7 +84,7 @@ func (m *Model) exitProviderSelection() {
 	m.providerSelectionMode = false
 	m.availableProviders = nil
 	m.selectedProviderIndex = 0
-	m.thinking = false
+	m.chatState.SetThinking(false)
 }
 
 func (m *Model) exitModelSelection() {
@@ -95,7 +95,7 @@ func (m *Model) exitModelSelection() {
 	m.filteredModels = nil
 	m.availableModels = nil
 	m.selectedModelIndex = 0
-	m.thinking = false
+	m.chatState.SetThinking(false)
 }
 
 func (m *Model) filterModels() {
