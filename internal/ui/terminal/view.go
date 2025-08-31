@@ -3,7 +3,7 @@ package terminal
 import (
 	"strings"
 
-	"github.com/mizzy/rigel/internal/completion"
+	"github.com/mizzy/rigel/internal/command"
 	"github.com/mizzy/rigel/internal/ui/render"
 )
 
@@ -16,8 +16,9 @@ func (m Model) View() string {
 	var s strings.Builder
 
 	// Render chat history using extracted render function
-	renderHistory := make([]render.Exchange, len(m.history))
-	for i, ex := range m.history {
+	history := m.chatState.GetHistory()
+	renderHistory := make([]render.Exchange, len(history))
+	for i, ex := range history {
 		renderHistory[i] = render.Exchange{
 			Prompt:   ex.Prompt,
 			Response: ex.Response,
@@ -36,19 +37,19 @@ func (m Model) View() string {
 	}
 
 	// Display thinking state
-	if m.thinking {
-		s.WriteString(render.ThinkingState(m.currentPrompt, m.spinner.View()))
+	if m.chatState.IsThinking() {
+		s.WriteString(render.ThinkingState(m.chatState.GetCurrentPrompt(), m.spinner.View()))
 	}
 
 	// Display input prompt and suggestions
-	if !m.thinking {
+	if !m.chatState.IsThinking() {
 		s.WriteString(render.InputPrompt(m.input.View()))
 
 		// Display command completions using render function
 		if m.showCompletions && len(m.completions) > 0 {
 			// Convert commands to render.Command format
-			renderCommands := make([]render.Command, len(completion.AvailableCommands))
-			for i, cmd := range completion.AvailableCommands {
+			renderCommands := make([]render.Command, len(command.AvailableCommands))
+			for i, cmd := range command.AvailableCommands {
 				renderCommands[i] = render.Command{
 					Command:     cmd.Command,
 					Description: cmd.Description,
@@ -60,7 +61,7 @@ func (m Model) View() string {
 
 	// Display messages using render functions
 	s.WriteString(render.InfoMessage(m.infoMessage))
-	s.WriteString(render.ErrorMessage(m.err))
+	s.WriteString(render.ErrorMessage(m.chatState.GetError()))
 
 	return s.String()
 }

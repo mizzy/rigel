@@ -14,10 +14,11 @@ func (m *Model) requestResponse(prompt string) tea.Cmd {
 		ctx := context.Background()
 
 		// Build message history from chat exchanges
-		messages := make([]llm.Message, 0, len(m.history)*2+1)
+		history := m.chatState.GetHistory()
+		messages := make([]llm.Message, 0, len(history)*2+1)
 
 		// Add previous exchanges to maintain context
-		for _, exchange := range m.history {
+		for _, exchange := range history {
 			messages = append(messages, llm.Message{
 				Role:    "user",
 				Content: exchange.Prompt,

@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mizzy/rigel/internal/command"
 )
 
 // Update handles incoming messages and returns updated application state
@@ -41,7 +42,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Reset Ctrl+C flag on any other key
 			m.ctrlCPressed = false
 			m.infoMessage = ""
-			if !m.thinking && m.input.Value() == "" {
+			if !m.chatState.IsThinking() && m.input.Value() == "" {
 				m.quitting = true
 				return m, tea.Quit
 			}
@@ -52,7 +53,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Handle Tab key for completion
-		if msg.String() == "tab" && !m.thinking && m.showCompletions {
+		if msg.String() == "tab" && !m.chatState.IsThinking() && m.showCompletions {
 			completionValue := m.completionHandler.GetCompletionValue(m.completions, m.selectedCompletion)
 			if completionValue != "" {
 				m.input.SetValue(completionValue)
@@ -66,7 +67,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Handle arrow keys for suggestion navigation or history navigation
-		if !m.thinking {
+		if !m.chatState.IsThinking() {
 			switch msg.String() {
 			case "up":
 				if m.showCompletions {
@@ -94,7 +95,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Check for Enter key specifically (not Alt+Enter)
-		if msg.String() == "enter" && !m.thinking {
+		if msg.String() == "enter" && !m.chatState.IsThinking() {
 			m.ctrlCPressed = false // Reset Ctrl+C flag
 			m.infoMessage = ""
 			// If completions are shown and one is selected, complete and execute it
@@ -109,26 +110,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// After completing suggestion, check if it's a command and execute it
 				if strings.HasPrefix(m.input.Value(), "/") {
 					// Treat it as if user pressed Enter with the command
-					m.currentPrompt = m.input.Value()
+					prompt := m.input.Value()
+					m.chatState.SetCurrentPrompt(prompt)
 
 					// Save to input history
-					m.inputHistory = append(m.inputHistory, m.currentPrompt)
+					m.inputHistory = append(m.inputHistory, prompt)
 					m.historyIndex = -1
 					m.currentInput = ""
 
 					// Save to persistent history
 					if m.historyManager != nil {
-						_ = m.historyManager.Add(m.currentPrompt)
+						_ = m.historyManager.Add(prompt)
 					}
 
 					m.input.SetValue("")
-					m.thinking = true
-					m.err = nil
+					m.chatState.SetThinking(true)
+					m.chatState.ClearError()
 					m.showCompletions = false
 
 					// Handle the command
-					trimmedPrompt := strings.TrimSpace(m.currentPrompt)
-					cmd := m.handleCommand(trimmedPrompt)
+					trimmedPrompt := strings.TrimSpace(m.chatState.GetCurrentPrompt())
+					result := m.commandHandler.HandleCommand(trimmedPrompt, &m)
+					cmd := m.convertCommandResultToCmd(result)
 					if cmd != nil {
 						return m, tea.Batch(cmd, m.spinner.Tick)
 					}
@@ -137,26 +140,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if strings.TrimSpace(m.input.Value()) != "" {
-				m.currentPrompt = m.input.Value()
+				prompt := m.input.Value()
+				m.chatState.SetCurrentPrompt(prompt)
 
 				// Save to input history
-				m.inputHistory = append(m.inputHistory, m.currentPrompt)
+				m.inputHistory = append(m.inputHistory, prompt)
 				m.historyIndex = -1
 				m.currentInput = ""
 
 				// Save to persistent history
 				if m.historyManager != nil {
-					_ = m.historyManager.Add(m.currentPrompt)
+					_ = m.historyManager.Add(prompt)
 				}
 
 				m.input.SetValue("")
-				m.thinking = true
-				m.err = nil
+				m.chatState.SetThinking(true)
+				m.chatState.ClearError()
 				m.showCompletions = false
 
 				// Handle commands
-				trimmedPrompt := strings.TrimSpace(m.currentPrompt)
-				cmd := m.handleCommand(trimmedPrompt)
+				trimmedPrompt := strings.TrimSpace(m.chatState.GetCurrentPrompt())
+				result := m.commandHandler.HandleCommand(trimmedPrompt, &m)
+				cmd := m.convertCommandResultToCmd(result)
 				if cmd != nil {
 					return m, tea.Batch(cmd, m.spinner.Tick)
 				}
@@ -165,7 +170,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Pass all other keys (including alt+enter and ctrl+j) to textarea
-		if !m.thinking {
+		if !m.chatState.IsThinking() {
 			oldValue := m.input.Value()
 			m.input, cmd = m.input.Update(msg)
 
@@ -224,38 +229,105 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 
+	case command.Result:
+		m.chatState.SetThinking(false)
+		if msg.Error != nil {
+			m.chatState.SetError(msg.Error)
+		} else if msg.Content != "" {
+			m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), msg.Content)
+			m.chatState.ClearCurrentPrompt()
+		}
+		return m, nil
+
+	case command.ModelSelectorMsg:
+		if msg.Error != nil {
+			return m, func() tea.Msg {
+				return aiResponse{err: msg.Error}
+			}
+		}
+
+		m.modelSelectionMode = true
+		m.availableModels = msg.Models
+		m.filteredModels = msg.Models
+		m.selectedModelIndex = 0
+		m.modelFilter = ""
+		m.input.SetValue("")
+		m.input.Placeholder = "Type to filter models, Enter to select, Esc to cancel"
+
+		return m, nil
+
+	case command.ProviderSelectorMsg:
+		m.providerSelectionMode = true
+		m.availableProviders = msg.Providers
+		m.selectedProviderIndex = 0
+
+		// Find current provider index
+		for i, p := range msg.Providers {
+			if p == msg.CurrentProvider {
+				m.selectedProviderIndex = i
+				break
+			}
+		}
+
+		return m, nil
+
+	case command.StatusInfo:
+		m.chatState.SetThinking(false)
+		// Convert StatusInfo to formatted string and display it
+		statusContent := fmt.Sprintf("✦ Rigel Session Status\n\n"+
+			"🤖 LLM Configuration\n"+
+			"  Provider: %s\n"+
+			"  Model: %s\n\n"+
+			"💬 Chat History\n"+
+			"  Messages: %d\n"+
+			"  User tokens: ~%d\n"+
+			"  Assistant tokens: ~%d\n"+
+			"  Total tokens: ~%d\n\n"+
+			"📝 Command History\n"+
+			"  Commands saved: %d\n"+
+			"  Persistence: %s\n\n"+
+			"🔧 Environment\n"+
+			"  Log level: %s\n"+
+			"  Repository context: %s\n",
+			msg.Provider, msg.Model,
+			msg.MessageCount,
+			msg.UserTokens, msg.AssistantTokens, msg.TotalTokens,
+			msg.CommandsCount,
+			map[bool]string{true: "✓ Enabled", false: "✗ Disabled"}[msg.PersistenceEnabled],
+			msg.LogLevel,
+			map[bool]string{true: "✓ AGENTS.md loaded", false: "✗ Not initialized (run /init)"}[msg.RepositoryInitialized])
+
+		m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), statusContent)
+		m.chatState.ClearCurrentPrompt()
+		return m, nil
+
 	case providerSwitchResponse:
 		m.provider = msg.provider
-		m.thinking = false
-		m.history = append(m.history, Exchange{
-			Prompt:   m.currentPrompt,
-			Response: fmt.Sprintf("Switched to provider: %s\nCurrent model: %s", msg.providerName, m.provider.GetCurrentModel()),
-		})
-		m.currentPrompt = ""
+		m.chatState.SetThinking(false)
+		response := fmt.Sprintf("Switched to provider: %s\nCurrent model: %s", msg.providerName, m.provider.GetCurrentModel())
+		m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), response)
+		m.chatState.ClearCurrentPrompt()
 		return m, nil
 
 	case aiResponse:
-		m.thinking = false
+		m.chatState.SetThinking(false)
 
 		if msg.err != nil {
-			m.err = msg.err
+			m.chatState.SetError(msg.err)
 		} else {
-			m.history = append(m.history, Exchange{
-				Prompt:   m.currentPrompt,
-				Response: msg.content,
-			})
-			m.currentPrompt = ""
+			m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), msg.content)
+			m.chatState.ClearCurrentPrompt()
 		}
 		return m, nil
 
 	case spinner.TickMsg:
-		if m.thinking {
+		if m.chatState.IsThinking() {
 			m.spinner, cmd = m.spinner.Update(msg)
 			return m, cmd
 		}
 	}
 
-	if !m.thinking {
+	if !m.chatState.IsThinking() {
 		m.input, cmd = m.input.Update(msg)
 		cmds = append(cmds, cmd)
 	}

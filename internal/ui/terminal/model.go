@@ -5,10 +5,11 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mizzy/rigel/internal/completion"
+	"github.com/mizzy/rigel/internal/command"
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/history"
 	"github.com/mizzy/rigel/internal/llm"
+	"github.com/mizzy/rigel/internal/state"
 )
 
 // Model represents the main chat interface
@@ -18,13 +19,10 @@ type Model struct {
 	input    textarea.Model
 	spinner  spinner.Model
 
-	history            []Exchange
+	chatState          *state.ChatState
 	inputHistory       []string
 	historyIndex       int
 	currentInput       string
-	thinking           bool
-	currentPrompt      string
-	err                error
 	quitting           bool
 	completions        []string
 	selectedCompletion int
@@ -46,14 +44,12 @@ type Model struct {
 	selectedProviderIndex int
 
 	// Handlers
-	completionHandler *completion.Handler
+	completionHandler *command.CompletionHandler
+	commandHandler    *command.Handler
 }
 
-// Exchange represents a single chat exchange
-type Exchange struct {
-	Prompt   string
-	Response string
-}
+// Exchange represents a single chat exchange - using state.Exchange
+type Exchange = state.Exchange
 
 // NewModel creates a new chat model instance
 func NewModel(provider llm.Provider, cfg *config.Config) *Model {
@@ -108,11 +104,12 @@ func NewModel(provider llm.Provider, cfg *config.Config) *Model {
 		config:            cfg,
 		input:             ta,
 		spinner:           s,
-		history:           []Exchange{},
+		chatState:         state.NewChatState(),
 		inputHistory:      []string{},
 		historyIndex:      -1,
 		historyManager:    histManager,
-		completionHandler: completion.NewHandler(),
+		completionHandler: command.NewCompletionHandler(),
+		commandHandler:    command.NewHandler(),
 	}
 
 	// Load input history from manager if available
