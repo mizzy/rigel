@@ -9,24 +9,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mizzy/rigel/internal/analyzer"
+	"github.com/mizzy/rigel/internal/completion"
 	"github.com/mizzy/rigel/internal/ui/styles"
 )
-
-// Available commands
-var availableCommands = []struct {
-	command     string
-	description string
-}{
-	{"/init", "Analyze repository and generate AGENTS.md"},
-	{"/model", "Show current model and select from available models"},
-	{"/provider", "Switch between LLM providers (Anthropic, Ollama, etc.)"},
-	{"/status", "Show current session status and configuration"},
-	{"/help", "Show available commands"},
-	{"/clear", "Clear chat history"},
-	{"/clearhistory", "Clear command history"},
-	{"/exit", "Exit the application"},
-	{"/quit", "Exit the application"},
-}
 
 // handleCommand processes commands and returns the appropriate tea.Cmd
 func (m *Model) handleCommand(trimmedPrompt string) tea.Cmd {
@@ -73,8 +58,8 @@ func (m *Model) showHelp() tea.Cmd {
 	return func() tea.Msg {
 		var help strings.Builder
 		help.WriteString("Available commands:\n\n")
-		for _, cmd := range availableCommands {
-			help.WriteString(fmt.Sprintf("  %s - %s\n", cmd.command, cmd.description))
+		for _, cmd := range completion.AvailableCommands {
+			help.WriteString(fmt.Sprintf("  %s - %s\n", cmd.Command, cmd.Description))
 		}
 		help.WriteString("\nKeyboard shortcuts:\n")
 		help.WriteString("  Tab       - Complete command\n")

@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Update handles messages and updates the model
+// Update handles incoming messages and returns updated application state
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
@@ -52,8 +52,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Handle Tab key for completion
-		if msg.String() == "tab" && !m.thinking && m.showSuggestions {
-			m.completeSuggestion()
+		if msg.String() == "tab" && !m.thinking && m.showCompletions {
+			completionValue := m.completionHandler.GetCompletionValue(m.completions, m.selectedCompletion)
+			if completionValue != "" {
+				m.input.SetValue(completionValue)
+				m.input.CursorEnd()
+				m.showCompletions = false
+				m.completions = []string{}
+			}
 			m.ctrlCPressed = false // Reset Ctrl+C flag
 			m.infoMessage = ""
 			return m, nil
@@ -63,9 +69,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.thinking {
 			switch msg.String() {
 			case "up":
-				if m.showSuggestions {
-					if m.selectedSuggestion > 0 {
-						m.selectedSuggestion--
+				if m.showCompletions {
+					if m.selectedCompletion > 0 {
+						m.selectedCompletion--
 					}
 				} else {
 					m.navigateHistory(-1)
@@ -74,9 +80,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.infoMessage = ""
 				return m, nil
 			case "down":
-				if m.showSuggestions {
-					if m.selectedSuggestion < len(m.suggestions)-1 {
-						m.selectedSuggestion++
+				if m.showCompletions {
+					if m.selectedCompletion < len(m.completions)-1 {
+						m.selectedCompletion++
 					}
 				} else {
 					m.navigateHistory(1)
@@ -91,9 +97,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "enter" && !m.thinking {
 			m.ctrlCPressed = false // Reset Ctrl+C flag
 			m.infoMessage = ""
-			// If suggestions are shown and one is selected, complete and execute it
-			if m.showSuggestions {
-				m.completeSuggestion()
+			// If completions are shown and one is selected, complete and execute it
+			if m.showCompletions {
+				completionValue := m.completionHandler.GetCompletionValue(m.completions, m.selectedCompletion)
+				if completionValue != "" {
+					m.input.SetValue(completionValue)
+					m.input.CursorEnd()
+				}
+				m.showCompletions = false
+				m.completions = []string{}
 				// After completing suggestion, check if it's a command and execute it
 				if strings.HasPrefix(m.input.Value(), "/") {
 					// Treat it as if user pressed Enter with the command
@@ -112,7 +124,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.input.SetValue("")
 					m.thinking = true
 					m.err = nil
-					m.showSuggestions = false
+					m.showCompletions = false
 
 					// Handle the command
 					trimmedPrompt := strings.TrimSpace(m.currentPrompt)
@@ -140,7 +152,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.SetValue("")
 				m.thinking = true
 				m.err = nil
-				m.showSuggestions = false
+				m.showCompletions = false
 
 				// Handle commands
 				trimmedPrompt := strings.TrimSpace(m.currentPrompt)
@@ -157,9 +169,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			oldValue := m.input.Value()
 			m.input, cmd = m.input.Update(msg)
 
-			// Update suggestions if input changed
+			// Update completions if input changed
 			if oldValue != m.input.Value() {
-				m.updateSuggestions()
+				m.completions, m.showCompletions = m.completionHandler.UpdateCompletions(m.input.Value())
+				m.selectedCompletion = 0
 				m.ctrlCPressed = false // Reset Ctrl+C flag when typing
 				m.infoMessage = ""
 

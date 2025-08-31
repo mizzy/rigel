@@ -5,6 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mizzy/rigel/internal/completion"
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/history"
 	"github.com/mizzy/rigel/internal/llm"
@@ -25,9 +26,9 @@ type Model struct {
 	currentPrompt      string
 	err                error
 	quitting           bool
-	suggestions        []string
-	selectedSuggestion int
-	showSuggestions    bool
+	completions        []string
+	selectedCompletion int
+	showCompletions    bool
 	ctrlCPressed       bool
 	infoMessage        string
 	historyManager     *history.Manager // Add history manager
@@ -43,6 +44,9 @@ type Model struct {
 	providerSelectionMode bool
 	availableProviders    []string
 	selectedProviderIndex int
+
+	// Handlers
+	completionHandler *completion.Handler
 }
 
 // Exchange represents a single chat exchange
@@ -100,14 +104,15 @@ func NewModel(provider llm.Provider, cfg *config.Config) *Model {
 	}
 
 	m := &Model{
-		provider:       provider,
-		config:         cfg,
-		input:          ta,
-		spinner:        s,
-		history:        []Exchange{},
-		inputHistory:   []string{},
-		historyIndex:   -1,
-		historyManager: histManager,
+		provider:          provider,
+		config:            cfg,
+		input:             ta,
+		spinner:           s,
+		history:           []Exchange{},
+		inputHistory:      []string{},
+		historyIndex:      -1,
+		historyManager:    histManager,
+		completionHandler: completion.NewHandler(),
 	}
 
 	// Load input history from manager if available

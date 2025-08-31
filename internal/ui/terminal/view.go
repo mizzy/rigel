@@ -3,6 +3,7 @@ package terminal
 import (
 	"strings"
 
+	"github.com/mizzy/rigel/internal/completion"
 	"github.com/mizzy/rigel/internal/ui/render"
 )
 
@@ -43,17 +44,17 @@ func (m Model) View() string {
 	if !m.thinking {
 		s.WriteString(render.InputPrompt(m.input.View()))
 
-		// Display command suggestions using render function
-		if m.showSuggestions && len(m.suggestions) > 0 {
+		// Display command completions using render function
+		if m.showCompletions && len(m.completions) > 0 {
 			// Convert commands to render.Command format
-			renderCommands := make([]render.Command, len(availableCommands))
-			for i, cmd := range availableCommands {
+			renderCommands := make([]render.Command, len(completion.AvailableCommands))
+			for i, cmd := range completion.AvailableCommands {
 				renderCommands[i] = render.Command{
-					Command:     cmd.command,
-					Description: cmd.description,
+					Command:     cmd.Command,
+					Description: cmd.Description,
 				}
 			}
-			s.WriteString(render.CommandSuggestions(m.suggestions, m.selectedSuggestion, renderCommands))
+			s.WriteString(render.CommandSuggestions(m.completions, m.selectedCompletion, renderCommands))
 		}
 	}
 
