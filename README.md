@@ -2,6 +2,8 @@
 
 A Go-based AI coding assistant that helps developers write, review, and improve code through natural language interactions.
 
+![Rigel Screenshot](images/rigel.jpg)
+
 ## Features
 
 - AI-powered coding assistant
@@ -131,18 +133,16 @@ The file contains:
 
 ✦ How do I read a file in Go?
 
-To read a file in Go, you have several options. Here's the most common approach:
+To read a file in Go, you have several options. Here's the most common approach using os.ReadFile():
 
-```go
-import (
-    "os"
-    "io"
-)
+  import (
+      "os"
+      "io"
+  )
 
-func readFile(path string) ([]byte, error) {
-    return os.ReadFile(path)
-}
-```
+  func readFile(path string) ([]byte, error) {
+      return os.ReadFile(path)
+  }
 
 ✦ █ Type a message or / for commands (Alt+Enter for new line)
 ```
