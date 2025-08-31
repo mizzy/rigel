@@ -12,7 +12,7 @@ import (
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/llm"
 	"github.com/mizzy/rigel/internal/sandbox"
-	"github.com/mizzy/rigel/internal/tui/chat"
+	"github.com/mizzy/rigel/internal/ui/terminal"
 	"github.com/mizzy/rigel/internal/version"
 	"github.com/spf13/cobra"
 )
@@ -99,7 +99,7 @@ review, and improve code through natural language interactions.`,
 }
 
 func runChatMode(provider llm.Provider) {
-	model := chat.NewModel(provider, cfg)
+	model := terminal.NewModel(provider, cfg)
 	p := tea.NewProgram(model)
 
 	if _, err := p.Run(); err != nil {

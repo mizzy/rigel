@@ -1,4 +1,4 @@
-package chat
+package terminal
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mizzy/rigel/internal/analyzer"
-	"github.com/mizzy/rigel/internal/tui/styles"
+	"github.com/mizzy/rigel/internal/ui/styles"
 )
 
 // Available commands

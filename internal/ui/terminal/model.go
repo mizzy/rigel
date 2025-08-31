@@ -1,4 +1,4 @@
-package chat
+package terminal
 
 import (
 	"github.com/charmbracelet/bubbles/spinner"
