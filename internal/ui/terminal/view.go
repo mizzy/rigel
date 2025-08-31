@@ -1,9 +1,9 @@
-package chat
+package terminal
 
 import (
 	"strings"
 
-	"github.com/mizzy/rigel/internal/tui/render"
+	"github.com/mizzy/rigel/internal/ui/render"
 )
 
 // View renders the chat interface

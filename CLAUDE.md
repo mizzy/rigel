@@ -28,7 +28,7 @@ go test ./...                 # Standard test run
 
 # Run tests for specific package
 go test ./internal/llm -v    # Test LLM package
-go test ./internal/tui -v    # Test TUI package
+go test ./internal/ui -v     # Test UI package
 
 # Test with coverage
 make test-coverage            # Coverage report
@@ -61,8 +61,8 @@ pre-commit run --all-files
 
 ### Core Components
 
-**TUI Chat System** (`internal/tui/`)
-- `chat.go`: Main chat model managing state, input handling, and rendering
+**Terminal UI System** (`internal/ui/terminal/`)
+- `model.go`: Main chat model managing state, input handling, and rendering
 - `commands.go`: Slash command handlers (`/init`, `/model`, `/provider`, `/help`)
 - Provider and model selection are handled through interactive modal interfaces
 - Uses Bubbletea framework for terminal UI with inline mode (no alternate screen)

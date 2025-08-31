@@ -30,7 +30,7 @@ The command‑line binary (`cmd/rigel`) offers a simple “agent” that you can
 | **internal/config** | `internal/config` | Holds configuration structs (LLM settings, tool list, UI mode) and parses config files/flags. |
 | **internal/llm** | `internal/llm` | LLM abstraction layer. Includes implementations for Anthropic (`anthropic.go`) and Ollama (`ollama.go`). `provider.go` defines the common interface. |
 | **internal/tools** | `internal/tools` | Collection of small utilities that can be invoked by the agent. Each implements the `Tool` interface. |
-| **internal/tui** | `internal/tui` | Text‑user‑interface modules. `analyzer.go` provides a code‑analysis view, while `simple.go` is a minimal UI mode. |
+| **internal/ui** | `internal/ui` | User interface modules. Contains terminal UI components and state management. |
 | **examples** | `examples/` | Example code snippets and usage demonstrations. |
 | **bin** | `bin/` | Optional binary artifacts or scripts (currently empty). |
 
@@ -52,8 +52,8 @@ The command‑line binary (`cmd/rigel`) offers a simple “agent” that you can
 | **File tool** | `internal/tools/file_tool.go` | Allows the agent to read or write files safely – a critical tool for code analysis. |
 | **Code analysis tool** | `internal/tools/code_tool.go` | Wraps simple code‑metrics (lines, complexity) for the LLM to query. |
 | **Tool interface** | `internal/tools/tool.go` | Uniform contract for all tools. Facilitates easy addition of new tools. |
-| **TUI analyzer view** | `internal/tui/analyzer.go` | Presents code analysis results interactively; uses termui for rich output. |
-| **TUI simple mode** | `internal/tui/simple.go` | Fallback minimal interface (text‑only). Useful for CI or headless environments. |
+| **Terminal UI components** | `internal/ui/terminal/` | Terminal interface for interactive chat and command handling. |
+| **UI state management** | `internal/ui/state/` | State management for UI components and user interactions. |
 
 ---
 

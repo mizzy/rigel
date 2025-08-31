@@ -1,4 +1,4 @@
-package chat
+package terminal
 
 // navigateHistory navigates through input history
 func (m *Model) navigateHistory(direction int) {
