@@ -26,8 +26,8 @@ type ModelSelectorMsg struct {
 
 // ProviderSelectorMsg represents a provider selection request
 type ProviderSelectorMsg struct {
-	CurrentProvider string
-	Providers       []string
+	CurrentProvider llm.Provider
+	Providers       []llm.Provider
 }
 
 // StatusInfo represents session status information

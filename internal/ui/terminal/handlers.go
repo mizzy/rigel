@@ -37,7 +37,7 @@ func (m *Model) requestResponse(prompt string) tea.Cmd {
 		})
 
 		// Use GenerateWithHistory to send full conversation context
-		provider := m.llmState.GetProvider()
+		provider := m.llmState.GetCurrentProvider()
 		if provider == nil {
 			return aiResponse{err: fmt.Errorf("no provider available")}
 		}

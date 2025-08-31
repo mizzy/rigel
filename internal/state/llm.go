@@ -9,9 +9,8 @@ import (
 // LLMState manages LLM configuration and selection
 type LLMState struct {
 	// Current LLM configuration
-	currentProvider string
-	currentModel    string
-	provider        llm.Provider
+	currentProvider llm.Provider
+	currentModel    llm.Model
 
 	// Model selection
 	modelSelectionActive bool
@@ -22,7 +21,7 @@ type LLMState struct {
 
 	// Provider selection
 	providerSelectionActive bool
-	availableProviders      []string
+	availableProviders      []llm.Provider
 	selectedProviderIndex   int
 }
 
@@ -36,32 +35,30 @@ func NewLLMState() *LLMState {
 // Current Configuration Methods
 
 // SetCurrentProvider updates the current provider
-func (ls *LLMState) SetCurrentProvider(providerName string, provider llm.Provider) {
-	ls.currentProvider = providerName
-	ls.provider = provider
+func (ls *LLMState) SetCurrentProvider(provider llm.Provider) {
+	ls.currentProvider = provider
 	if provider != nil {
 		ls.currentModel = provider.GetCurrentModel()
 	}
 }
 
-// GetCurrentProvider returns the current provider name
-func (ls *LLMState) GetCurrentProvider() string {
+// GetCurrentProvider returns the current provider
+func (ls *LLMState) GetCurrentProvider() llm.Provider {
 	return ls.currentProvider
 }
 
-// GetCurrentModel returns the current model name
-func (ls *LLMState) GetCurrentModel() string {
+// GetCurrentModel returns the current model
+func (ls *LLMState) GetCurrentModel() llm.Model {
+	// If currentModel is empty and we have a provider, get its current model
+	if ls.currentModel.Name == "" && ls.currentProvider != nil {
+		ls.currentModel = ls.currentProvider.GetCurrentModel()
+	}
 	return ls.currentModel
 }
 
-// GetProvider returns the current LLM provider
-func (ls *LLMState) GetProvider() llm.Provider {
-	return ls.provider
-}
-
-// SetCurrentModel updates the current model name
-func (ls *LLMState) SetCurrentModel(modelName string) {
-	ls.currentModel = modelName
+// SetCurrentModel updates the current model
+func (ls *LLMState) SetCurrentModel(model llm.Model) {
+	ls.currentModel = model
 }
 
 // Model Selection Methods
@@ -163,7 +160,7 @@ func (ls *LLMState) IsProviderSelectionActive() bool {
 }
 
 // ActivateProviderSelection enters provider selection mode
-func (ls *LLMState) ActivateProviderSelection(providers []string, currentProvider string) {
+func (ls *LLMState) ActivateProviderSelection(providers []llm.Provider, currentProvider llm.Provider) {
 	ls.providerSelectionActive = true
 	ls.availableProviders = providers
 	ls.selectedProviderIndex = 0
@@ -185,7 +182,7 @@ func (ls *LLMState) DeactivateProviderSelection() {
 }
 
 // GetAvailableProviders returns available providers
-func (ls *LLMState) GetAvailableProviders() []string {
+func (ls *LLMState) GetAvailableProviders() []llm.Provider {
 	return ls.availableProviders
 }
 
@@ -195,9 +192,9 @@ func (ls *LLMState) GetSelectedProviderIndex() int {
 }
 
 // GetSelectedProvider returns the currently selected provider
-func (ls *LLMState) GetSelectedProvider() (string, bool) {
+func (ls *LLMState) GetSelectedProvider() (llm.Provider, bool) {
 	if !ls.providerSelectionActive || len(ls.availableProviders) == 0 || ls.selectedProviderIndex >= len(ls.availableProviders) {
-		return "", false
+		return nil, false
 	}
 	return ls.availableProviders[ls.selectedProviderIndex], true
 }

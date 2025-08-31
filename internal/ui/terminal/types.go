@@ -22,7 +22,7 @@ type modelSelectorMsg struct {
 
 // providerSelectorMsg is sent when provider selection is requested
 type providerSelectorMsg struct {
-	providers       []string
-	currentProvider string
+	providers       []llm.Provider
+	currentProvider llm.Provider
 	err             error
 }

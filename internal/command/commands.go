@@ -9,6 +9,7 @@ import (
 
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/history"
+	"github.com/mizzy/rigel/internal/llm"
 	"github.com/mizzy/rigel/internal/state"
 )
 
@@ -66,12 +67,12 @@ func showModelSelector(llmState *state.LLMState) Result {
 
 	currentModel := llmState.GetCurrentModel()
 
-	provider := llmState.GetProvider()
+	provider := llmState.GetCurrentProvider()
 	if provider == nil {
 		return Result{
 			Type: "model_selector",
 			ModelSelector: &ModelSelectorMsg{
-				CurrentModel: currentModel,
+				CurrentModel: currentModel.Name,
 				Error:        fmt.Errorf("no provider available"),
 			},
 		}
@@ -82,7 +83,7 @@ func showModelSelector(llmState *state.LLMState) Result {
 		return Result{
 			Type: "model_selector",
 			ModelSelector: &ModelSelectorMsg{
-				CurrentModel: currentModel,
+				CurrentModel: currentModel.Name,
 				Error:        err,
 			},
 		}
@@ -90,7 +91,7 @@ func showModelSelector(llmState *state.LLMState) Result {
 	return Result{
 		Type: "model_selector",
 		ModelSelector: &ModelSelectorMsg{
-			CurrentModel: currentModel,
+			CurrentModel: currentModel.Name,
 			Models:       models,
 		},
 	}
@@ -98,11 +99,11 @@ func showModelSelector(llmState *state.LLMState) Result {
 
 // showProviderSelector shows the provider selector interface
 func showProviderSelector(llmState *state.LLMState) Result {
-	// Get available providers
-	providers := []string{"anthropic", "ollama"}
-
-	// Get current provider from LLMState
+	// For now, we need to create provider instances to show them
+	// This is a limitation - we don't have a registry of available providers
+	// TODO: Create a provider registry system
 	currentProvider := llmState.GetCurrentProvider()
+	providers := []llm.Provider{currentProvider} // Only show current provider for now
 
 	return Result{
 		Type: "provider_selector",
@@ -141,8 +142,8 @@ func showStatus(llmState *state.LLMState, chatState *state.ChatState, config *co
 	}
 
 	statusInfo := StatusInfo{
-		Provider:              provider,
-		Model:                 model,
+		Provider:              provider.GetName(),
+		Model:                 model.Name,
 		MessageCount:          chatState.GetMessageCount(),
 		UserTokens:            approxUserTokens,
 		AssistantTokens:       approxAssistantTokens,

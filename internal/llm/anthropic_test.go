@@ -13,21 +13,21 @@ func TestNewAnthropicProvider(t *testing.T) {
 		name          string
 		apiKey        string
 		model         string
-		expectedModel string
+		expectedModel Model
 		expectedError bool
 	}{
 		{
 			name:          "valid with custom model",
 			apiKey:        "test-api-key",
 			model:         "claude-3-opus-20240229",
-			expectedModel: "claude-3-opus-20240229",
+			expectedModel: Model{Name: "claude-3-opus-20240229"},
 			expectedError: false,
 		},
 		{
 			name:          "valid with default model",
 			apiKey:        "test-api-key",
 			model:         "",
-			expectedModel: "claude-sonnet-4-20250514",
+			expectedModel: Model{Name: "claude-sonnet-4-20250514"},
 			expectedError: false,
 		},
 		{

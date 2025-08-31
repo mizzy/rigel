@@ -166,7 +166,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Pass all other keys (including alt+enter and ctrl+j) to textarea
-		if !m.chatState.IsThinking() {
+		if !m.chatState.IsThinking() && !m.llmState.IsModelSelectionActive() && !m.llmState.IsProviderSelectionActive() {
 			oldValue := m.input.Value()
 			m.input, cmd = m.input.Update(msg)
 
@@ -301,9 +301,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case providerSwitchResponse:
-		m.llmState.SetCurrentProvider(msg.providerName, msg.provider)
+		m.llmState.SetCurrentProvider(msg.provider)
 		m.chatState.SetThinking(false)
-		response := fmt.Sprintf("Switched to provider: %s\nCurrent model: %s", msg.providerName, m.llmState.GetCurrentModel())
+		response := fmt.Sprintf("Switched to provider: %s\nCurrent model: %s", msg.providerName, m.llmState.GetCurrentModel().Name)
 		m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), response)
 		m.chatState.ClearCurrentPrompt()
 		return m, nil
@@ -326,7 +326,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if !m.chatState.IsThinking() {
+	if !m.chatState.IsThinking() && !m.llmState.IsModelSelectionActive() && !m.llmState.IsProviderSelectionActive() {
 		m.input, cmd = m.input.Update(msg)
 		cmds = append(cmds, cmd)
 	}

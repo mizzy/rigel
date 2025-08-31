@@ -13,8 +13,9 @@ type Provider interface {
 	GenerateWithHistory(ctx context.Context, messages []Message, opts GenerateOptions) (string, error)
 	Stream(ctx context.Context, prompt string) (<-chan StreamResponse, error)
 	ListModels(ctx context.Context) ([]Model, error)
-	GetCurrentModel() string
-	SetModel(model string)
+	GetCurrentModel() Model
+	SetModel(model Model)
+	GetName() string
 }
 
 type Message struct {

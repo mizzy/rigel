@@ -88,7 +88,7 @@ func NewModel(provider llm.Provider, cfg *config.Config) *Model {
 
 	llmState := state.NewLLMState()
 	if cfg != nil {
-		llmState.SetCurrentProvider(cfg.Provider, provider)
+		llmState.SetCurrentProvider(provider)
 	}
 
 	m := &Model{
