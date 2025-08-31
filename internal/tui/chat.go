@@ -12,7 +12,7 @@ import (
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/history"
 	"github.com/mizzy/rigel/internal/llm"
-	"golang.org/x/term"
+	"github.com/mizzy/rigel/internal/tui/render"
 )
 
 // ChatModel represents the main chat interface
@@ -510,16 +510,6 @@ func (m *ChatModel) switchModel(modelName string) tea.Cmd {
 	}
 }
 
-// getTerminalWidth returns the current terminal width
-func getTerminalWidth() int {
-	width, _, err := term.GetSize(0)
-	if err != nil {
-		// Default to 80 columns if we can't get terminal size
-		return 80
-	}
-	return width
-}
-
 // View renders the chat interface
 func (m ChatModel) View() string {
 	if m.quitting {
@@ -528,170 +518,52 @@ func (m ChatModel) View() string {
 
 	var s strings.Builder
 
-	// Get terminal width and calculate usable widths
-	termWidth := getTerminalWidth()
-	promptWidth := termWidth - 3 // Account for prompt symbol and space
-	responseWidth := termWidth - 2
-
-	for _, ex := range m.history {
-		// User prompt with > symbol
-		s.WriteString(promptSymbol)
-		s.WriteString(" ")
-
-		// Use lipgloss Width() for proper wrapping
-		promptStyle := inputStyle.Width(promptWidth)
-		s.WriteString(promptStyle.Render(ex.Prompt))
-		s.WriteString("\n\n")
-
-		// Assistant response with wrapping
-		responseStyle := outputStyle.Width(responseWidth)
-		s.WriteString(responseStyle.Render(ex.Response))
-		s.WriteString("\n\n")
+	// Render chat history using extracted render function
+	renderHistory := make([]render.Exchange, len(m.history))
+	for i, ex := range m.history {
+		renderHistory[i] = render.Exchange{
+			Prompt:   ex.Prompt,
+			Response: ex.Response,
+		}
 	}
+	s.WriteString(render.ChatHistory(renderHistory))
 
 	// Display provider selection interface if in provider selection mode
 	if m.providerSelectionMode {
-		s.WriteString("\nProvider Selection\n\n")
-		currentProvider := ""
-		if m.config != nil {
-			currentProvider = m.config.Provider
-		}
-		s.WriteString(fmt.Sprintf("Current: %s\n\n", currentModelStyle.Render(currentProvider)))
-
-		s.WriteString("Available providers:\n")
-		for i, provider := range m.availableProviders {
-			prefix := "  "
-			isSelected := i == m.selectedProviderIndex
-			isCurrent := provider == currentProvider
-
-			providerDisplay := provider
-
-			// Apply styles based on state
-			if isCurrent {
-				// Current provider gets blue bold style
-				providerDisplay = currentModelStyle.Render(providerDisplay)
-				if isSelected {
-					prefix = currentModelStyle.Render("❯ ")
-				}
-			} else if isSelected {
-				// Selected (cursor) provider gets yellow style
-				providerDisplay = selectedModelStyle.Render(providerDisplay)
-				prefix = selectedModelStyle.Render("❯ ")
-			}
-
-			s.WriteString(fmt.Sprintf("%s%s\n", prefix, providerDisplay))
-		}
-
-		s.WriteString("\nUse up/down arrows to navigate, Enter to select, Esc to cancel")
-
-		return s.String()
+		return render.ProviderSelector(m.availableProviders, m.selectedProviderIndex)
 	}
 
 	// Display model selection interface if in model selection mode
 	if m.modelSelectionMode {
-		s.WriteString("\nModel Selection\n\n")
-		s.WriteString(fmt.Sprintf("Current: %s\n\n", currentModelStyle.Render(m.provider.GetCurrentModel())))
-
-		if len(m.filteredModels) == 0 {
-			s.WriteString("No models match your filter.\n")
-		} else {
-			s.WriteString("Available models:\n")
-			for i, model := range m.filteredModels {
-				prefix := "  "
-				isSelected := i == m.selectedModelIndex
-				isCurrent := model.Name == m.provider.GetCurrentModel()
-
-				modelDisplay := model.Name
-				if model.Details.ParameterSize != "" {
-					modelDisplay += fmt.Sprintf(" (%s)", model.Details.ParameterSize)
-				}
-
-				// Apply styles based on state
-				if isCurrent {
-					// Current model gets blue bold style
-					modelDisplay = currentModelStyle.Render(modelDisplay)
-					if isSelected {
-						prefix = currentModelStyle.Render("❯ ")
-					}
-				} else if isSelected {
-					// Selected (cursor) model gets yellow style
-					modelDisplay = selectedModelStyle.Render(modelDisplay)
-					prefix = selectedModelStyle.Render("❯ ")
-				}
-
-				s.WriteString(fmt.Sprintf("%s%s\n", prefix, modelDisplay))
-			}
-		}
-
-		s.WriteString("\nFilter: ")
-		s.WriteString(m.input.View())
-		s.WriteString("\n\nUse up/down arrows to navigate, Enter to select, Esc to cancel")
-
-		return s.String()
+		return render.ModelSelector(m.filteredModels, m.selectedModelIndex, m.modelFilter)
 	}
 
-	// Display current prompt if thinking
-	if m.thinking && m.currentPrompt != "" {
-		s.WriteString(promptSymbol)
-		s.WriteString(" ")
-
-		// Use lipgloss Width() for proper wrapping
-		promptStyle := inputStyle.Width(promptWidth)
-		s.WriteString(promptStyle.Render(m.currentPrompt))
-		s.WriteString("\n\n")
-		s.WriteString(m.spinner.View())
-		s.WriteString(thinkingStyle.Render(" Thinking..."))
-		s.WriteString("\n")
+	// Display thinking state
+	if m.thinking {
+		s.WriteString(render.ThinkingState(m.currentPrompt, m.spinner.View()))
 	}
 
-	// Display input prompt
+	// Display input prompt and suggestions
 	if !m.thinking {
-		s.WriteString(promptSymbol)
-		s.WriteString(" ")
-		// Use textarea's native rendering to handle IME and cursor properly
-		textareaView := m.input.View()
-		// Handle multi-line alignment by replacing newlines with proper indentation
-		lines := strings.Split(textareaView, "\n")
-		for i, line := range lines {
-			if i > 0 {
-				s.WriteString("\n  ") // 2 spaces to align with prompt symbol + space
-			}
-			s.WriteString(line)
-		}
+		s.WriteString(render.InputPrompt(m.input.View()))
 
-		// Display command suggestions
+		// Display command suggestions using render function
 		if m.showSuggestions && len(m.suggestions) > 0 {
-			s.WriteString("\n\n")
-			s.WriteString(suggestionStyle.Render("Commands:"))
-			s.WriteString("\n")
-			for i, suggestion := range m.suggestions {
-				if i == m.selectedSuggestion {
-					s.WriteString(highlightStyle.Render(fmt.Sprintf("  → %s", suggestion)))
-				} else {
-					s.WriteString(suggestionStyle.Render(fmt.Sprintf("    %s", suggestion)))
+			// Convert commands to render.Command format
+			renderCommands := make([]render.Command, len(availableCommands))
+			for i, cmd := range availableCommands {
+				renderCommands[i] = render.Command{
+					Command:     cmd.command,
+					Description: cmd.description,
 				}
-				// Add description
-				for _, cmd := range availableCommands {
-					if cmd.command == suggestion {
-						s.WriteString(suggestionStyle.Render(fmt.Sprintf(" - %s", cmd.description)))
-						break
-					}
-				}
-				s.WriteString("\n")
 			}
-			s.WriteString("\n")
-			s.WriteString(suggestionStyle.Render("Press Tab or Enter to complete, ↑/↓ to navigate"))
-		}
-
-		// Display info message or error at the bottom
-		if m.infoMessage != "" {
-			s.WriteString("\n\n")
-			s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(m.infoMessage))
-		} else if m.err != nil {
-			s.WriteString("\n\n")
-			s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Render(m.err.Error()))
+			s.WriteString(render.CommandSuggestions(m.suggestions, m.selectedSuggestion, renderCommands))
 		}
 	}
+
+	// Display messages using render functions
+	s.WriteString(render.InfoMessage(m.infoMessage))
+	s.WriteString(render.ErrorMessage(m.err))
 
 	return s.String()
 }
