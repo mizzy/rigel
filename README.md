@@ -2,14 +2,28 @@
 
 A Go-based AI coding assistant that helps developers write, review, and improve code through natural language interactions.
 
+> [!NOTE]
+> Rigel is currently a chat interface for AI models. Tool integrations for file operations, code execution, and repository management are not yet implemented. The full coding agent functionality is actively under development.
+
 ![Rigel Screenshot](images/rigel.jpg)
 
 ## Features
 
-- AI-powered coding assistant
-- Multiple LLM providers (Anthropic, Ollama)
-- Clean terminal-based chat interface
-- Sandbox support for safe code execution
+### Current Features
+- AI-powered chat interface for coding assistance
+- Multiple LLM providers (Anthropic Claude, Ollama local models)
+- Clean terminal-based interactive UI with command completion
+- Repository analysis and context generation (`/init` command)
+- Provider and model switching during runtime
+- Command history and session management
+- Sandbox support for safe code execution (macOS only)
+
+### Planned Features (Coming Soon)
+- Tool integrations for file operations (read, write, edit files)
+- Code execution and testing capabilities
+- Git operations and repository management
+- Syntax highlighting and code formatting
+- Integrated development workflow automation
 
 ## Requirements
 
@@ -170,23 +184,34 @@ cat prompt.txt | rigel
 ```
 rigel/
 ├── cmd/
-│   └── rigel/         # CLI entry point
-├── internal/
-│   ├── agent/         # AI agent functionality
-│   ├── analyzer/      # Repository analysis
-│   ├── config/        # Configuration management
-│   ├── history/       # Command history management
-│   ├── llm/           # LLM provider integrations
-│   │   ├── anthropic.go  # Anthropic Claude integration
-│   │   └── ollama.go     # Ollama local models
-│   ├── sandbox/       # Sandbox for safe code execution
-│   ├── tools/         # Tool integrations
-│   ├── tui/           # Terminal UI components
-│   │   ├── chat.go       # Main chat model
-│   │   ├── commands.go   # Command handling
-│   │   ├── suggestions.go # Autocomplete logic
-│   │   └── styles.go     # Color scheme
-│   └── version/       # Version information
+│   └── rigel/           # CLI entry point
+└── internal/
+    ├── agent/           # AI agent functionality
+    ├── analyzer/        # Repository analysis
+    ├── command/         # Command processing and definitions
+    │   ├── commands.go     # Command implementations
+    │   ├── completion.go   # Command completion logic
+    │   ├── definitions.go  # Available commands
+    │   ├── handler.go      # Main command handler
+    │   └── types.go        # Command result types
+    ├── config/          # Configuration management
+    ├── history/         # Command history management
+    ├── llm/             # LLM provider integrations
+    │   ├── anthropic.go    # Anthropic Claude integration
+    │   ├── ollama.go       # Ollama local models
+    │   ├── provider.go     # Provider interface
+    │   └── agents_loader.go # Repository context loader
+    ├── sandbox/         # Sandbox for safe code execution (macOS)
+    ├── state/           # Application state management
+    │   ├── chat.go         # Chat history and session state
+    │   └── llm.go          # LLM configuration and selection
+    ├── tools/           # Tool integrations (planned)
+    ├── ui/              # Terminal UI components
+    │   ├── handlers/       # Input event handlers
+    │   ├── render/         # UI rendering logic
+    │   ├── styles/         # Color schemes and styling
+    │   └── terminal/       # Main terminal interface
+    └── version/         # Version information
 ```
 
 ## Development
