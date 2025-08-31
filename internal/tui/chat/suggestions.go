@@ -1,9 +1,9 @@
-package tui
+package chat
 
 import "strings"
 
 // updateSuggestions updates the command suggestions based on user input
-func (m *ChatModel) updateSuggestions() {
+func (m *Model) updateSuggestions() {
 	value := m.input.Value()
 	m.suggestions = []string{}
 	m.showSuggestions = false
@@ -24,7 +24,7 @@ func (m *ChatModel) updateSuggestions() {
 }
 
 // completeSuggestion completes the selected suggestion
-func (m *ChatModel) completeSuggestion() {
+func (m *Model) completeSuggestion() {
 	if m.showSuggestions && m.selectedSuggestion < len(m.suggestions) {
 		m.input.SetValue(m.suggestions[m.selectedSuggestion])
 		m.input.CursorEnd()
