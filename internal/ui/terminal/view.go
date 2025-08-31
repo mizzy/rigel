@@ -27,13 +27,13 @@ func (m Model) View() string {
 	s.WriteString(render.ChatHistory(renderHistory))
 
 	// Display provider selection interface if in provider selection mode
-	if m.providerSelectionMode {
-		return render.ProviderSelector(m.availableProviders, m.selectedProviderIndex)
+	if m.llmState.IsProviderSelectionActive() {
+		return render.ProviderSelector(m.llmState.GetAvailableProviders(), m.llmState.GetSelectedProviderIndex())
 	}
 
 	// Display model selection interface if in model selection mode
-	if m.modelSelectionMode {
-		return render.ModelSelector(m.filteredModels, m.selectedModelIndex, m.modelFilter)
+	if m.llmState.IsModelSelectionActive() {
+		return render.ModelSelector(m.llmState.GetFilteredModels(), m.llmState.GetSelectedModelIndex(), m.llmState.GetModelFilter())
 	}
 
 	// Display thinking state

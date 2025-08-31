@@ -14,10 +14,9 @@ import (
 
 // Model represents the main chat interface
 type Model struct {
-	provider llm.Provider
-	config   *config.Config
-	input    textarea.Model
-	spinner  spinner.Model
+	config  *config.Config
+	input   textarea.Model
+	spinner spinner.Model
 
 	chatState          *state.ChatState
 	inputHistory       []string
@@ -30,22 +29,10 @@ type Model struct {
 	ctrlCPressed       bool
 	infoMessage        string
 	historyManager     *history.Manager // Add history manager
-
-	// Model selection mode
-	modelSelectionMode bool
-	availableModels    []llm.Model
-	filteredModels     []llm.Model
-	selectedModelIndex int
-	modelFilter        string
-
-	// Provider selection mode
-	providerSelectionMode bool
-	availableProviders    []string
-	selectedProviderIndex int
+	llmState           *state.LLMState
 
 	// Handlers
 	completionHandler *command.CompletionHandler
-	commandHandler    *command.Handler
 }
 
 // Exchange represents a single chat exchange - using state.Exchange
@@ -99,8 +86,12 @@ func NewModel(provider llm.Provider, cfg *config.Config) *Model {
 		_ = histManager.Load()
 	}
 
+	llmState := state.NewLLMState()
+	if cfg != nil {
+		llmState.SetCurrentProvider(cfg.Provider, provider)
+	}
+
 	m := &Model{
-		provider:          provider,
 		config:            cfg,
 		input:             ta,
 		spinner:           s,
@@ -108,8 +99,8 @@ func NewModel(provider llm.Provider, cfg *config.Config) *Model {
 		inputHistory:      []string{},
 		historyIndex:      -1,
 		historyManager:    histManager,
+		llmState:          llmState,
 		completionHandler: command.NewCompletionHandler(),
-		commandHandler:    command.NewHandler(),
 	}
 
 	// Load input history from manager if available

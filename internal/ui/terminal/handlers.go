@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -36,7 +37,11 @@ func (m *Model) requestResponse(prompt string) tea.Cmd {
 		})
 
 		// Use GenerateWithHistory to send full conversation context
-		response, err := m.provider.GenerateWithHistory(ctx, messages, llm.GenerateOptions{})
+		provider := m.llmState.GetProvider()
+		if provider == nil {
+			return aiResponse{err: fmt.Errorf("no provider available")}
+		}
+		response, err := provider.GenerateWithHistory(ctx, messages, llm.GenerateOptions{})
 		if err != nil {
 			return aiResponse{err: err}
 		}

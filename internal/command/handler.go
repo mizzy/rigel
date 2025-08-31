@@ -3,39 +3,36 @@ package command
 import (
 	"fmt"
 	"strings"
+
+	"github.com/mizzy/rigel/internal/config"
+	"github.com/mizzy/rigel/internal/history"
+	"github.com/mizzy/rigel/internal/state"
 )
 
-// Handler handles command processing
-type Handler struct{}
-
-// NewHandler creates a new command handler
-func NewHandler() *Handler {
-	return &Handler{}
-}
-
 // HandleCommand processes a command and returns the result
-func (h *Handler) HandleCommand(command string, cmdContext CommandContext) Result {
+// This function is stateless and doesn't need a Handler struct
+func HandleCommand(command string, llmState *state.LLMState, chatState *state.ChatState, cfg *config.Config, historyManager *history.Manager, inputHistory []string) Result {
 	switch command {
 	case "/init":
-		return h.analyzeRepository(cmdContext)
+		return analyzeRepository()
 
 	case "/model":
-		return h.showModelSelector(cmdContext)
+		return showModelSelector(llmState)
 
 	case "/provider":
-		return h.showProviderSelector(cmdContext)
+		return showProviderSelector(llmState)
 
 	case "/status":
-		return h.showStatus(cmdContext)
+		return showStatus(llmState, chatState, cfg, historyManager, inputHistory)
 
 	case "/help":
-		return h.showHelp()
+		return showHelp()
 
 	case "/clear":
-		return h.clearChatHistory(cmdContext)
+		return clearChatHistory(chatState)
 
 	case "/clearhistory":
-		return h.clearCommandHistory(cmdContext)
+		return clearCommandHistory(historyManager)
 
 	case "/exit", "/quit":
 		return Result{Type: "quit"}

@@ -1,8 +1,6 @@
 package command
 
 import (
-	"context"
-
 	"github.com/mizzy/rigel/internal/llm"
 )
 
@@ -17,22 +15,6 @@ type Result struct {
 	ModelSelector    *ModelSelectorMsg
 	ProviderSelector *ProviderSelectorMsg
 	StatusInfo       *StatusInfo
-}
-
-// CommandContext interface defines what the command handler needs from the UI
-type CommandContext interface {
-	// State accessors for command implementations
-	GetProviderName() string
-	GetCurrentModel() string
-	ListModels(context.Context) ([]llm.Model, error)
-	GetLogLevel() string
-	GetStatusInfo() StatusInfo
-	GetInputHistory() []string
-
-	// State mutators for command implementations
-	ClearChatHistory()
-	ClearInputHistory()
-	ClearPersistentHistory() error
 }
 
 // ModelSelectorMsg represents a model selection request

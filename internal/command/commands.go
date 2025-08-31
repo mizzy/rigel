@@ -6,10 +6,14 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/mizzy/rigel/internal/config"
+	"github.com/mizzy/rigel/internal/history"
+	"github.com/mizzy/rigel/internal/state"
 )
 
 // showHelp displays the help message
-func (h *Handler) showHelp() Result {
+func showHelp() Result {
 	var help strings.Builder
 	help.WriteString("Available commands:\n\n")
 	for _, cmd := range AvailableCommands {
@@ -29,7 +33,7 @@ func (h *Handler) showHelp() Result {
 }
 
 // analyzeRepository analyzes the repository and generates AGENTS.md
-func (h *Handler) analyzeRepository(cmdContext CommandContext) Result {
+func analyzeRepository() Result {
 	// Check if AGENTS.md already exists
 	if _, err := os.Stat("AGENTS.md"); err == nil {
 		return Result{
@@ -56,12 +60,24 @@ func (h *Handler) analyzeRepository(cmdContext CommandContext) Result {
 }
 
 // showModelSelector shows the model selector interface
-func (h *Handler) showModelSelector(cmdContext CommandContext) Result {
+func showModelSelector(llmState *state.LLMState) Result {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	currentModel := cmdContext.GetCurrentModel()
-	models, err := cmdContext.ListModels(ctx)
+	currentModel := llmState.GetCurrentModel()
+
+	provider := llmState.GetProvider()
+	if provider == nil {
+		return Result{
+			Type: "model_selector",
+			ModelSelector: &ModelSelectorMsg{
+				CurrentModel: currentModel,
+				Error:        fmt.Errorf("no provider available"),
+			},
+		}
+	}
+
+	models, err := provider.ListModels(ctx)
 	if err != nil {
 		return Result{
 			Type: "model_selector",
@@ -81,12 +97,12 @@ func (h *Handler) showModelSelector(cmdContext CommandContext) Result {
 }
 
 // showProviderSelector shows the provider selector interface
-func (h *Handler) showProviderSelector(cmdContext CommandContext) Result {
+func showProviderSelector(llmState *state.LLMState) Result {
 	// Get available providers
 	providers := []string{"anthropic", "ollama"}
 
-	// Get current provider from config
-	currentProvider := cmdContext.GetProviderName()
+	// Get current provider from LLMState
+	currentProvider := llmState.GetCurrentProvider()
 
 	return Result{
 		Type: "provider_selector",
@@ -98,8 +114,45 @@ func (h *Handler) showProviderSelector(cmdContext CommandContext) Result {
 }
 
 // showStatus returns session status information
-func (h *Handler) showStatus(cmdContext CommandContext) Result {
-	statusInfo := cmdContext.GetStatusInfo()
+func showStatus(llmState *state.LLMState, chatState *state.ChatState, config *config.Config, historyManager *history.Manager, inputHistory []string) Result {
+	provider := llmState.GetCurrentProvider()
+	model := llmState.GetCurrentModel()
+
+	logLevel := ""
+	if config != nil {
+		logLevel = config.LogLevel
+	}
+
+	// Calculate token usage
+	totalUserChars := 0
+	totalAssistantChars := 0
+	for _, exchange := range chatState.GetHistory() {
+		totalUserChars += len(exchange.Prompt)
+		totalAssistantChars += len(exchange.Response)
+	}
+	approxUserTokens := totalUserChars / 4
+	approxAssistantTokens := totalAssistantChars / 4
+	totalTokens := approxUserTokens + approxAssistantTokens
+
+	// Check if AGENTS.md exists
+	repositoryInitialized := false
+	if _, err := os.Stat("AGENTS.md"); err == nil {
+		repositoryInitialized = true
+	}
+
+	statusInfo := StatusInfo{
+		Provider:              provider,
+		Model:                 model,
+		MessageCount:          chatState.GetMessageCount(),
+		UserTokens:            approxUserTokens,
+		AssistantTokens:       approxAssistantTokens,
+		TotalTokens:           totalTokens,
+		CommandsCount:         len(inputHistory),
+		PersistenceEnabled:    historyManager != nil,
+		LogLevel:              logLevel,
+		RepositoryInitialized: repositoryInitialized,
+	}
+
 	return Result{
 		Type:       "status",
 		StatusInfo: &statusInfo,
@@ -107,27 +160,27 @@ func (h *Handler) showStatus(cmdContext CommandContext) Result {
 }
 
 // clearChatHistory clears the chat history
-func (h *Handler) clearChatHistory(cmdContext CommandContext) Result {
-	cmdContext.ClearChatHistory()
+func clearChatHistory(chatState *state.ChatState) Result {
+	chatState.ClearHistory()
 	return Result{
 		Type: "clear",
 	}
 }
 
 // clearCommandHistory clears the command input history
-func (h *Handler) clearCommandHistory(cmdContext CommandContext) Result {
-	cmdContext.ClearInputHistory()
-
+func clearCommandHistory(historyManager *history.Manager) Result {
 	// Clear persistent history if available
-	if err := cmdContext.ClearPersistentHistory(); err != nil {
-		return Result{
-			Type:  "response",
-			Error: fmt.Errorf("failed to clear history: %w", err),
+	if historyManager != nil {
+		if err := historyManager.Clear(); err != nil {
+			return Result{
+				Type:  "response",
+				Error: fmt.Errorf("failed to clear history: %w", err),
+			}
 		}
 	}
 
+	// Return result indicating input history should be cleared
 	return Result{
-		Type:    "response",
-		Content: "Command history cleared successfully.",
+		Type: "clear_input_history",
 	}
 }
