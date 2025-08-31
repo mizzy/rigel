@@ -38,11 +38,15 @@ func (m *TestConversationProvider) ListModels(ctx context.Context) ([]Model, err
 	return []Model{{Name: "test-model"}}, nil
 }
 
-func (m *TestConversationProvider) GetCurrentModel() string {
-	return "test-model"
+func (m *TestConversationProvider) GetCurrentModel() Model {
+	return Model{Name: "test-model"}
 }
 
-func (m *TestConversationProvider) SetModel(model string) {
+func (m *TestConversationProvider) GetName() string {
+	return "test"
+}
+
+func (m *TestConversationProvider) SetModel(model Model) {
 	// no-op for mock
 }
 

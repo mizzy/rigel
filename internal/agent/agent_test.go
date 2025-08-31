@@ -47,12 +47,17 @@ func (m *MockProvider) ListModels(ctx context.Context) ([]llm.Model, error) {
 	return nil, args.Error(1)
 }
 
-func (m *MockProvider) GetCurrentModel() string {
+func (m *MockProvider) GetCurrentModel() llm.Model {
+	args := m.Called()
+	return args.Get(0).(llm.Model)
+}
+
+func (m *MockProvider) GetName() string {
 	args := m.Called()
 	return args.String(0)
 }
 
-func (m *MockProvider) SetModel(model string) {
+func (m *MockProvider) SetModel(model llm.Model) {
 	m.Called(model)
 }
 

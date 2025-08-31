@@ -2,36 +2,30 @@ package terminal
 
 import (
 	"fmt"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mizzy/rigel/internal/llm"
 )
 
-func (m *Model) handleProviderSelectionKey(msg tea.KeyMsg) (*Model, tea.Cmd) {
+func (m *Model) handleProviderSelectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc:
 		m.exitProviderSelection()
 		return m, nil
 
 	case tea.KeyEnter:
-		if m.selectedProviderIndex < len(m.availableProviders) {
-			selectedProvider := m.availableProviders[m.selectedProviderIndex]
+		if provider, ok := m.llmState.GetSelectedProvider(); ok {
 			m.exitProviderSelection()
-			return m, m.switchProvider(selectedProvider)
+			return m, m.switchProvider(provider)
 		}
 		return m, nil
 
 	case tea.KeyUp:
-		if m.selectedProviderIndex > 0 {
-			m.selectedProviderIndex--
-		}
+		m.llmState.MoveProviderSelectionUp()
 		return m, nil
 
 	case tea.KeyDown:
-		if m.selectedProviderIndex < len(m.availableProviders)-1 {
-			m.selectedProviderIndex++
-		}
+		m.llmState.MoveProviderSelectionDown()
 		return m, nil
 
 	default:
@@ -39,108 +33,97 @@ func (m *Model) handleProviderSelectionKey(msg tea.KeyMsg) (*Model, tea.Cmd) {
 	}
 }
 
-func (m *Model) handleModelSelectionKey(msg tea.KeyMsg) (*Model, tea.Cmd) {
+func (m *Model) handleModelSelectionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc:
 		m.exitModelSelection()
 		return m, nil
 
 	case tea.KeyEnter:
-		if len(m.filteredModels) > 0 && m.selectedModelIndex < len(m.filteredModels) {
-			selectedModel := m.filteredModels[m.selectedModelIndex]
+		if model, ok := m.llmState.GetSelectedModel(); ok {
 			m.exitModelSelection()
-			return m, m.switchModel(selectedModel.Name)
+			return m, m.switchModel(model)
 		}
 		return m, nil
 
 	case tea.KeyUp:
-		if m.selectedModelIndex > 0 {
-			m.selectedModelIndex--
-		}
+		m.llmState.MoveModelSelectionUp()
 		return m, nil
 
 	case tea.KeyDown:
-		if m.selectedModelIndex < len(m.filteredModels)-1 {
-			m.selectedModelIndex++
+		m.llmState.MoveModelSelectionDown()
+		return m, nil
+
+	case tea.KeyBackspace:
+		// Handle backspace for filtering - manually update filter
+		currentFilter := m.llmState.GetModelFilter()
+		if len(currentFilter) > 0 {
+			newFilter := currentFilter[:len(currentFilter)-1]
+			m.llmState.SetModelFilter(newFilter)
+			m.input.SetValue(newFilter)
+		}
+		return m, nil
+
+	case tea.KeyRunes:
+		// Handle printable characters for filtering
+		runes := msg.Runes
+		if len(runes) > 0 {
+			// Ignore non-printable characters
+			if runes[0] < 32 || runes[0] > 126 {
+				return m, nil
+			}
+
+			// Add to filter
+			currentFilter := m.llmState.GetModelFilter()
+			newFilter := currentFilter + string(runes)
+			m.llmState.SetModelFilter(newFilter)
+			m.input.SetValue(newFilter)
 		}
 		return m, nil
 
 	default:
-		var cmd tea.Cmd
-		m.input, cmd = m.input.Update(msg)
-
-		newFilter := m.input.Value()
-		if newFilter != m.modelFilter {
-			m.modelFilter = newFilter
-			m.filterModels()
-			m.selectedModelIndex = 0
-		}
-
-		return m, cmd
+		// Explicitly ignore all other keys to prevent unintended behavior
+		return m, nil
 	}
 }
 
 func (m *Model) exitProviderSelection() {
-	m.providerSelectionMode = false
-	m.availableProviders = nil
-	m.selectedProviderIndex = 0
+	m.llmState.DeactivateProviderSelection()
 	m.chatState.SetThinking(false)
 }
 
 func (m *Model) exitModelSelection() {
-	m.modelSelectionMode = false
+	m.llmState.DeactivateModelSelection()
 	m.input.SetValue("")
 	m.input.Placeholder = "Type a message or / for commands (Alt+Enter for new line)"
-	m.modelFilter = ""
-	m.filteredModels = nil
-	m.availableModels = nil
-	m.selectedModelIndex = 0
 	m.chatState.SetThinking(false)
 }
 
-func (m *Model) filterModels() {
-	if m.modelFilter == "" {
-		m.filteredModels = m.availableModels
-		return
-	}
-
-	filter := strings.ToLower(m.modelFilter)
-	m.filteredModels = nil
-
-	for _, model := range m.availableModels {
-		if strings.Contains(strings.ToLower(model.Name), filter) {
-			m.filteredModels = append(m.filteredModels, model)
-		}
-	}
-}
-
-func (m *Model) switchProvider(providerName string) tea.Cmd {
+func (m *Model) switchProvider(provider llm.Provider) tea.Cmd {
 	return func() tea.Msg {
 		// Update config
 		if m.config != nil {
-			m.config.Provider = providerName
-		}
-
-		// Create new provider
-		newProvider, err := llm.NewProvider(m.config)
-		if err != nil {
-			return aiResponse{err: fmt.Errorf("failed to switch provider: %w", err)}
+			m.config.Provider = provider.GetName()
 		}
 
 		return providerSwitchResponse{
-			provider:     newProvider,
-			providerName: providerName,
+			provider:     provider,
+			providerName: provider.GetName(),
 		}
 	}
 }
 
-func (m *Model) switchModel(modelName string) tea.Cmd {
+func (m *Model) switchModel(model llm.Model) tea.Cmd {
 	// Actually switch the model
-	m.provider.SetModel(modelName)
+	provider := m.llmState.GetCurrentProvider()
+	if provider != nil {
+		provider.SetModel(model)
+		m.llmState.SetCurrentModel(model)
+	}
 
 	return func() tea.Msg {
 		return aiResponse{
-			content: fmt.Sprintf("Switched to model: %s", modelName),
+			content: fmt.Sprintf("Switched to model: %s", model.Name),
 		}
 	}
 }

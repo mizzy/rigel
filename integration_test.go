@@ -243,10 +243,14 @@ func (m *MockLLMProvider) ListModels(ctx context.Context) ([]llm.Model, error) {
 	}, nil
 }
 
-func (m *MockLLMProvider) GetCurrentModel() string {
-	return "test-model-1"
+func (m *MockLLMProvider) GetCurrentModel() llm.Model {
+	return llm.Model{Name: "test-model-1"}
 }
 
-func (m *MockLLMProvider) SetModel(model string) {
+func (m *MockLLMProvider) GetName() string {
+	return "mock"
+}
+
+func (m *MockLLMProvider) SetModel(model llm.Model) {
 	// Mock implementation - no-op
 }

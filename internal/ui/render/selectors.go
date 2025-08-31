@@ -45,7 +45,7 @@ func ModelSelector(models []llm.Model, selectedIndex int, filter string) string 
 }
 
 // ProviderSelector renders the provider selection interface
-func ProviderSelector(providers []string, selectedIndex int) string {
+func ProviderSelector(providers []llm.Provider, selectedIndex int) string {
 	if len(providers) == 0 {
 		return "No providers available"
 	}
@@ -55,11 +55,12 @@ func ProviderSelector(providers []string, selectedIndex int) string {
 
 	// Display providers
 	for i, provider := range providers {
+		providerName := provider.GetName()
 		if i == selectedIndex {
 			style := lipgloss.NewStyle().Foreground(lipgloss.Color("87")).Bold(true)
-			sb.WriteString(style.Render(fmt.Sprintf("> %s", provider)))
+			sb.WriteString(style.Render(fmt.Sprintf("> %s", providerName)))
 		} else {
-			sb.WriteString(fmt.Sprintf("  %s", provider))
+			sb.WriteString(fmt.Sprintf("  %s", providerName))
 		}
 		sb.WriteString("\n")
 	}

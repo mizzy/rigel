@@ -14,7 +14,7 @@ import (
 
 type AnthropicProvider struct {
 	client *anthropic.Client
-	model  string
+	model  Model
 	apiKey string
 }
 
@@ -31,9 +31,11 @@ func NewAnthropicProvider(apiKey string, model string) (*AnthropicProvider, erro
 		model = "claude-sonnet-4-20250514"
 	}
 
+	modelStruct := Model{Name: model}
+
 	return &AnthropicProvider{
 		client: client,
-		model:  model,
+		model:  modelStruct,
 		apiKey: apiKey,
 	}, nil
 }
@@ -51,7 +53,7 @@ func (p *AnthropicProvider) GenerateWithOptions(ctx context.Context, prompt stri
 }
 
 func (p *AnthropicProvider) GenerateWithHistory(ctx context.Context, messages []Message, opts GenerateOptions) (string, error) {
-	model := p.model
+	model := p.model.Name
 	if opts.Model != "" {
 		model = opts.Model
 	}
@@ -116,7 +118,7 @@ func (p *AnthropicProvider) Stream(ctx context.Context, prompt string) (<-chan S
 		defer close(ch)
 
 		stream := p.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
-			Model: anthropic.F(p.model),
+			Model: anthropic.F(anthropic.Model(p.model.Name)),
 			Messages: anthropic.F([]anthropic.MessageParam{
 				anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
 			}),
@@ -170,11 +172,15 @@ func (p *AnthropicProvider) ListModels(ctx context.Context) ([]Model, error) {
 	return models, nil
 }
 
-func (p *AnthropicProvider) GetCurrentModel() string {
+func (p *AnthropicProvider) GetCurrentModel() Model {
 	return p.model
 }
 
-func (p *AnthropicProvider) SetModel(model string) {
+func (p *AnthropicProvider) GetName() string {
+	return "anthropic"
+}
+
+func (p *AnthropicProvider) SetModel(model Model) {
 	p.model = model
 }
 

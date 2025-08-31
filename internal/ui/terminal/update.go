@@ -17,12 +17,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		// Handle provider selection mode
-		if m.providerSelectionMode {
+		if m.llmState.IsProviderSelectionActive() {
 			return m.handleProviderSelectionKey(msg)
 		}
 
 		// Handle model selection mode
-		if m.modelSelectionMode {
+		if m.llmState.IsModelSelectionActive() {
 			return m.handleModelSelectionKey(msg)
 		}
 
@@ -130,11 +130,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					// Handle the command
 					trimmedPrompt := strings.TrimSpace(m.chatState.GetCurrentPrompt())
-					result := m.commandHandler.HandleCommand(trimmedPrompt, &m)
-					cmd := m.convertCommandResultToCmd(result)
-					if cmd != nil {
-						return m, tea.Batch(cmd, m.spinner.Tick)
-					}
+					result := command.HandleCommand(trimmedPrompt, m.llmState, m.chatState, m.config, m.historyManager, m.inputHistory)
+					cmd := func() tea.Msg { return result }
+					return m, tea.Batch(cmd, m.spinner.Tick)
 				}
 				return m, nil
 			}
@@ -160,17 +158,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				// Handle commands
 				trimmedPrompt := strings.TrimSpace(m.chatState.GetCurrentPrompt())
-				result := m.commandHandler.HandleCommand(trimmedPrompt, &m)
-				cmd := m.convertCommandResultToCmd(result)
-				if cmd != nil {
-					return m, tea.Batch(cmd, m.spinner.Tick)
-				}
+				result := command.HandleCommand(trimmedPrompt, m.llmState, m.chatState, m.config, m.historyManager, m.inputHistory)
+				cmd := func() tea.Msg { return result }
+				return m, tea.Batch(cmd, m.spinner.Tick)
 			}
 			return m, nil
 		}
 
 		// Pass all other keys (including alt+enter and ctrl+j) to textarea
-		if !m.chatState.IsThinking() {
+		if !m.chatState.IsThinking() && !m.llmState.IsModelSelectionActive() && !m.llmState.IsProviderSelectionActive() {
 			oldValue := m.input.Value()
 			m.input, cmd = m.input.Update(msg)
 
@@ -198,18 +194,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		m.providerSelectionMode = true
-		m.availableProviders = msg.providers
-		m.selectedProviderIndex = 0
-
-		// Find current provider index
-		for i, p := range msg.providers {
-			if p == msg.currentProvider {
-				m.selectedProviderIndex = i
-				break
-			}
-		}
-
+		m.llmState.ActivateProviderSelection(msg.providers, msg.currentProvider)
 		return m, nil
 
 	case modelSelectorMsg:
@@ -219,11 +204,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		m.modelSelectionMode = true
-		m.availableModels = msg.models
-		m.filteredModels = msg.models
-		m.selectedModelIndex = 0
-		m.modelFilter = ""
+		m.llmState.ActivateModelSelection(msg.models)
 		m.input.SetValue("")
 		m.input.Placeholder = "Type to filter models, Enter to select, Esc to cancel"
 
@@ -233,9 +214,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.chatState.SetThinking(false)
 		if msg.Error != nil {
 			m.chatState.SetError(msg.Error)
-		} else if msg.Content != "" {
-			m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), msg.Content)
-			m.chatState.ClearCurrentPrompt()
+		} else {
+			switch msg.Type {
+			case "clear_input_history":
+				// Clear input history
+				m.inputHistory = []string{}
+				m.historyIndex = -1
+				m.currentInput = ""
+				m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), "Command history cleared successfully.")
+				m.chatState.ClearCurrentPrompt()
+			case "request":
+				// Handle normal prompts (non-commands)
+				return m, m.requestResponse(msg.Prompt)
+			case "model_selector":
+				if msg.ModelSelector != nil {
+					return m, func() tea.Msg { return *msg.ModelSelector }
+				}
+			case "provider_selector":
+				if msg.ProviderSelector != nil {
+					return m, func() tea.Msg { return *msg.ProviderSelector }
+				}
+			case "status":
+				if msg.StatusInfo != nil {
+					return m, func() tea.Msg { return *msg.StatusInfo }
+				}
+			case "quit":
+				m.quitting = true
+				return m, tea.Quit
+			case "clear":
+				// Clear handled above by SetThinking(false)
+				return m, nil
+			default:
+				if msg.Content != "" {
+					m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), msg.Content)
+					m.chatState.ClearCurrentPrompt()
+				}
+			}
 		}
 		return m, nil
 
@@ -246,29 +260,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		m.modelSelectionMode = true
-		m.availableModels = msg.Models
-		m.filteredModels = msg.Models
-		m.selectedModelIndex = 0
-		m.modelFilter = ""
+		m.llmState.ActivateModelSelection(msg.Models)
 		m.input.SetValue("")
 		m.input.Placeholder = "Type to filter models, Enter to select, Esc to cancel"
 
 		return m, nil
 
 	case command.ProviderSelectorMsg:
-		m.providerSelectionMode = true
-		m.availableProviders = msg.Providers
-		m.selectedProviderIndex = 0
-
-		// Find current provider index
-		for i, p := range msg.Providers {
-			if p == msg.CurrentProvider {
-				m.selectedProviderIndex = i
-				break
-			}
-		}
-
+		m.llmState.ActivateProviderSelection(msg.Providers, msg.CurrentProvider)
 		return m, nil
 
 	case command.StatusInfo:
@@ -302,9 +301,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case providerSwitchResponse:
-		m.provider = msg.provider
+		m.llmState.SetCurrentProvider(msg.provider)
 		m.chatState.SetThinking(false)
-		response := fmt.Sprintf("Switched to provider: %s\nCurrent model: %s", msg.providerName, m.provider.GetCurrentModel())
+		response := fmt.Sprintf("Switched to provider: %s\nCurrent model: %s", msg.providerName, m.llmState.GetCurrentModel().Name)
 		m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), response)
 		m.chatState.ClearCurrentPrompt()
 		return m, nil
@@ -327,7 +326,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if !m.chatState.IsThinking() {
+	if !m.chatState.IsThinking() && !m.llmState.IsModelSelectionActive() && !m.llmState.IsProviderSelectionActive() {
 		m.input, cmd = m.input.Update(msg)
 		cmds = append(cmds, cmd)
 	}

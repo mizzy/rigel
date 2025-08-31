@@ -12,7 +12,7 @@ import (
 
 type OllamaProvider struct {
 	baseURL string
-	model   string
+	model   Model
 	client  *http.Client
 }
 
@@ -25,9 +25,11 @@ func NewOllamaProvider(baseURL, model string) (*OllamaProvider, error) {
 		model = "llama3.2"
 	}
 
+	modelStruct := Model{Name: model}
+
 	return &OllamaProvider{
 		baseURL: strings.TrimSuffix(baseURL, "/"),
-		model:   model,
+		model:   modelStruct,
 		client:  &http.Client{},
 	}, nil
 }
@@ -90,7 +92,7 @@ func (p *OllamaProvider) GenerateWithOptions(ctx context.Context, prompt string,
 }
 
 func (p *OllamaProvider) GenerateWithHistory(ctx context.Context, messages []Message, opts GenerateOptions) (string, error) {
-	model := p.model
+	model := p.model.Name
 	if opts.Model != "" {
 		model = opts.Model
 	}
@@ -175,7 +177,7 @@ func (p *OllamaProvider) Stream(ctx context.Context, prompt string) (<-chan Stre
 		defer close(ch)
 
 		reqBody := ollamaGenerateRequest{
-			Model:  p.model,
+			Model:  p.model.Name,
 			Prompt: prompt,
 			Stream: true,
 		}
@@ -306,10 +308,14 @@ func (p *OllamaProvider) ListModels(ctx context.Context) ([]Model, error) {
 	return models, nil
 }
 
-func (p *OllamaProvider) GetCurrentModel() string {
+func (p *OllamaProvider) GetCurrentModel() Model {
 	return p.model
 }
 
-func (p *OllamaProvider) SetModel(model string) {
+func (p *OllamaProvider) GetName() string {
+	return "ollama"
+}
+
+func (p *OllamaProvider) SetModel(model Model) {
 	p.model = model
 }
