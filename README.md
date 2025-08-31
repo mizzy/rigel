@@ -2,6 +2,8 @@
 
 A Go-based AI coding assistant that helps developers write, review, and improve code through natural language interactions.
 
+![Rigel Screenshot](images/rigel.jpg)
+
 ## Features
 
 - AI-powered coding assistant
