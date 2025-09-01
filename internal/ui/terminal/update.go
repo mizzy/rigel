@@ -76,7 +76,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.selectedCompletion--
 					}
 				} else {
-					m.navigateHistory(-1)
+					histState := m.getHistoryNavigationState()
+					handlers.NavigateHistory(-1, &m.input, histState)
+					m.updateFromHistoryNavigationState(histState)
 				}
 				m.ctrlCPressed = false // Reset Ctrl+C flag
 				m.infoMessage = ""
@@ -87,7 +89,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.selectedCompletion++
 					}
 				} else {
-					m.navigateHistory(1)
+					histState := m.getHistoryNavigationState()
+					handlers.NavigateHistory(1, &m.input, histState)
+					m.updateFromHistoryNavigationState(histState)
 				}
 				m.ctrlCPressed = false // Reset Ctrl+C flag
 				m.infoMessage = ""
