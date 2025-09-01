@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -118,6 +119,11 @@ func TestExecute(t *testing.T) {
 			task:         "Write a hello world function",
 			expectedResp: "Here's a hello world function in Go:\n```go\nfunc HelloWorld() string {\n    return \"Hello, World!\"\n}\n```",
 			setupMock: func(m *MockProvider) {
+				// First call for intent analysis
+				m.On("Generate", mock.Anything, mock.MatchedBy(func(prompt string) bool {
+					return strings.Contains(prompt, "intent analyzer")
+				})).Return(`[{"intent":"none","filepath":"","content":""}]`, nil)
+				// Second call for actual response
 				m.On("GenerateWithOptions", mock.Anything, mock.Anything, mock.Anything).
 					Return("Here's a hello world function in Go:\n```go\nfunc HelloWorld() string {\n    return \"Hello, World!\"\n}\n```", nil)
 			},
@@ -127,6 +133,11 @@ func TestExecute(t *testing.T) {
 			task:          "Invalid task",
 			expectedError: assert.AnError,
 			setupMock: func(m *MockProvider) {
+				// First call for intent analysis
+				m.On("Generate", mock.Anything, mock.MatchedBy(func(prompt string) bool {
+					return strings.Contains(prompt, "intent analyzer")
+				})).Return(`[{"intent":"none","filepath":"","content":""}]`, nil)
+				// Second call fails
 				m.On("GenerateWithOptions", mock.Anything, mock.Anything, mock.Anything).
 					Return("", assert.AnError)
 			},
@@ -304,6 +315,11 @@ func TestMemoryPersistenceAcrossExecutions(t *testing.T) {
 	mockProvider := new(MockProvider)
 	agent := New(mockProvider)
 
+	// Mock intent analysis for first call
+	mockProvider.On("Generate", mock.Anything, mock.MatchedBy(func(prompt string) bool {
+		return strings.Contains(prompt, "intent analyzer") && strings.Contains(prompt, "First task")
+	})).Return(`[{"intent":"none","filepath":"","content":""}]`, nil).Once()
+
 	mockProvider.On("GenerateWithOptions", mock.Anything, "First task", mock.Anything).
 		Return("First response", nil).Once()
 
@@ -317,6 +333,11 @@ user: First task
 assistant: First response
 
 Current task: Second task`
+
+	// Mock intent analysis for second call
+	mockProvider.On("Generate", mock.Anything, mock.MatchedBy(func(prompt string) bool {
+		return strings.Contains(prompt, "intent analyzer") && strings.Contains(prompt, "Second task")
+	})).Return(`[{"intent":"none","filepath":"","content":""}]`, nil).Once()
 
 	mockProvider.On("GenerateWithOptions", mock.Anything, expectedPrompt, mock.Anything).
 		Return("Second response", nil).Once()

@@ -5,12 +5,14 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mizzy/rigel/internal/agent"
 	"github.com/mizzy/rigel/internal/command"
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/git"
 	"github.com/mizzy/rigel/internal/history"
 	"github.com/mizzy/rigel/internal/llm"
 	"github.com/mizzy/rigel/internal/state"
+	"github.com/mizzy/rigel/internal/tools"
 )
 
 // Model represents the main chat interface
@@ -32,6 +34,9 @@ type Model struct {
 	historyManager     *history.Manager // Add history manager
 	llmState           *state.LLMState
 	gitInfo            *git.Info // Git repository information
+
+	// Intelligent Agent with file tools
+	agent *agent.Agent
 
 	// Handlers
 	completionHandler *command.CompletionHandler
@@ -93,6 +98,15 @@ func NewModel(provider llm.Provider, cfg *config.Config) *Model {
 		llmState.SetCurrentProvider(provider)
 	}
 
+	// Create intelligent agent with file tools
+	intelligentAgent := agent.New(provider)
+	fileTool := tools.NewFileTool()
+	intelligentAgent.RegisterTool(fileTool)
+
+	// Use UIProgressDisplay for interactive mode to avoid interfering with terminal UI
+	uiProgress := agent.NewUIProgressDisplay()
+	intelligentAgent.SetProgressDisplay(uiProgress)
+
 	m := &Model{
 		config:            cfg,
 		input:             ta,
@@ -103,6 +117,7 @@ func NewModel(provider llm.Provider, cfg *config.Config) *Model {
 		historyManager:    histManager,
 		llmState:          llmState,
 		gitInfo:           git.GetRepoInfo(),
+		agent:             intelligentAgent,
 		completionHandler: command.NewCompletionHandler(),
 	}
 

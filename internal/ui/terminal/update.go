@@ -266,8 +266,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), "Command history cleared successfully.")
 				m.chatState.ClearCurrentPrompt()
 			case "request":
-				// Handle normal prompts (non-commands) - keep thinking state ON
-				return m, handlers.RequestResponse(msg.Prompt, m.llmState, m.chatState)
+				// Handle normal prompts (non-commands) using intelligent agent - keep thinking state ON
+				return m, handlers.RequestResponseWithAgent(msg.Prompt, m.agent)
 			case "model_selector":
 				m.chatState.SetThinking(false)
 				if msg.ModelSelector != nil {
