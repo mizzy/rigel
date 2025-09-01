@@ -50,30 +50,39 @@ func (a *Agent) Execute(ctx context.Context, task string) (string, error) {
 	var toolResults []ToolExecutionResult
 	var finalResponse strings.Builder
 
-	// Analyze prompt for file operations if auto-tool is enabled
+	// Phase 1: Analyze prompt for file operations with conversation history
 	if a.autoToolEnabled {
-		matches := a.promptAnalyzer.AnalyzePrompt(task)
+		matches := a.promptAnalyzer.AnalyzePromptWithHistory(task, a.memory.conversationHistory)
 		if len(matches) > 0 {
-			finalResponse.WriteString("I'll help you with that. Let me execute the necessary file operations:\n\n")
+			// Phase 2: Create structured tasks from intents
+			tasks := CreateTasksFromMatches(matches)
 
-			// Process matches and generate content if needed
-			for i, match := range matches {
-				if match.Intent == IntentWrite && match.Content == "<GENERATE_TEXT>" {
-					// Generate content using LLM
-					contentPrompt := fmt.Sprintf("Generate appropriate content for a file based on this user request: %s\n\nProvide only the content to be written, no explanations.", task)
+			finalResponse.WriteString("I'll help you with that. Here's what I need to do:\n\n")
+
+			// Show task list to user
+			for i, taskItem := range tasks {
+				finalResponse.WriteString(fmt.Sprintf("%d. %s\n", i+1, taskItem.Description))
+			}
+			finalResponse.WriteString("\nExecuting tasks...\n\n")
+
+			// Phase 3: Process tasks and generate content if needed
+			for i, taskItem := range tasks {
+				if taskItem.Match.Intent == IntentWrite && taskItem.Match.Content == "<GENERATE_TEXT>" {
+					// Generate content using LLM with conversation context
+					contentPrompt := a.buildContentGenerationPrompt(task, a.memory.conversationHistory)
 					generatedContent, err := a.provider.Generate(ctx, contentPrompt)
 					if err == nil {
-						matches[i].Content = strings.TrimSpace(generatedContent)
+						tasks[i].Match.Content = strings.TrimSpace(generatedContent)
 					} else {
-						matches[i].Content = "Sample text generated for user request."
+						tasks[i].Match.Content = "Sample text generated for user request."
 					}
 				}
 			}
 
-			// If using UIProgressDisplay, include progress messages first
+			// Phase 4: Execute tasks with progress tracking
 			if uiDisplay, ok := a.progressDisplay.(*UIProgressDisplay); ok {
 				// Execute with progress tracking
-				toolResults = a.ExecuteFileOperationsWithProgress(ctx, matches, a.progressDisplay)
+				toolResults = a.ExecuteTasksWithProgress(ctx, tasks, a.progressDisplay)
 
 				// Add progress messages
 				progressMessages := uiDisplay.GetAllMessages()
@@ -83,7 +92,7 @@ func (a *Agent) Execute(ctx context.Context, task string) (string, error) {
 				}
 			} else {
 				// Execute without UI progress display
-				toolResults = a.ExecuteFileOperationsWithProgress(ctx, matches, a.progressDisplay)
+				toolResults = a.ExecuteTasksWithProgress(ctx, tasks, a.progressDisplay)
 			}
 
 			// Build response with tool results (detailed output)
@@ -208,4 +217,30 @@ func (a *Agent) buildToolContext(results []ToolExecutionResult) string {
 		}
 	}
 	return strings.Join(context, "\n")
+}
+
+// buildContentGenerationPrompt creates a context-aware prompt for content generation
+func (a *Agent) buildContentGenerationPrompt(task string, history []Message) string {
+	var contextBuilder strings.Builder
+
+	contextBuilder.WriteString("Generate appropriate, realistic content for a file based on this user request.\n")
+	contextBuilder.WriteString("The content should be meaningful and ready to use, not placeholder text.\n\n")
+
+	// Add conversation context if available
+	if len(history) > 0 {
+		contextBuilder.WriteString("Conversation context:\n")
+		for _, msg := range history {
+			contextBuilder.WriteString(fmt.Sprintf("%s: %s\n", msg.Role, msg.Content))
+		}
+		contextBuilder.WriteString("\n")
+	}
+
+	contextBuilder.WriteString(fmt.Sprintf("Current request: %s\n\n", task))
+	contextBuilder.WriteString("Examples:\n")
+	contextBuilder.WriteString("- If creating config.json, generate valid JSON configuration\n")
+	contextBuilder.WriteString("- If creating README.md, generate actual documentation\n")
+	contextBuilder.WriteString("- If creating sample text, generate meaningful content\n\n")
+	contextBuilder.WriteString("Provide ONLY the file content to be written, no explanations, no questions, no markdown code blocks.")
+
+	return contextBuilder.String()
 }
