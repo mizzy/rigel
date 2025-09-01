@@ -115,6 +115,14 @@ type PromptAnalyzer struct {
 	}
 }
 
+// Task represents a specific task to be executed
+type Task struct {
+	ID          string
+	Description string
+	Match       FileOperationMatch
+	DependsOn   []string // Task IDs this task depends on
+}
+
 // NewPromptAnalyzer creates a new LLM-based prompt analyzer
 func NewPromptAnalyzer(llmProvider interface {
 	Generate(ctx context.Context, prompt string) (string, error)
@@ -126,34 +134,49 @@ func NewPromptAnalyzer(llmProvider interface {
 
 // AnalyzePrompt analyzes a user prompt using LLM and returns file operation intents
 func (pa *PromptAnalyzer) AnalyzePrompt(prompt string) []FileOperationMatch {
+	return pa.AnalyzePromptWithHistory(prompt, []Message{})
+}
+
+// AnalyzePromptWithHistory analyzes a user prompt with conversation history context
+func (pa *PromptAnalyzer) AnalyzePromptWithHistory(prompt string, history []Message) []FileOperationMatch {
 	ctx := context.Background()
 
-	systemPrompt := `You are a file operation intent analyzer. Analyze the given user prompt and determine if it contains any file operation requests.
+	systemPrompt := `You are a file operation intent analyzer with access to conversation history. Analyze the given user prompt in context and determine if it contains any file operation requests.
+
+You have access to previous conversation context to resolve references like "it", "that file", "the config", etc.
 
 Respond with a JSON array containing file operations. Each operation should have:
 - "intent": one of "read", "write", "list", "exists", "delete", "none"
-- "filepath": the target file path (use "sample.txt" if not specified for write operations)
+- "filepath": the target file path (resolve references using context, use "sample.txt" if not specified for write operations)
 - "content": the content to write (only for write operations). Use "<GENERATE_TEXT>" when the user asks to generate content like "sample text", "dummy content", "適当な文章", "some text", etc.
 
-Examples:
-User: "read config.json"
+Examples with context:
+Conversation: [User: "create config.json", Assistant: "Created config.json"]
+User: "read it"
 Response: [{"intent":"read","filepath":"config.json","content":""}]
 
-User: "create a file with hello world"
-Response: [{"intent":"write","filepath":"sample.txt","content":"hello world"}]
+Conversation: [User: "write hello to test.txt", Assistant: "Written to test.txt"]
+User: "delete that file"
+Response: [{"intent":"delete","filepath":"test.txt","content":""}]
 
 User: "適当な文章をファイルに書き出して"
 Response: [{"intent":"write","filepath":"sample.txt","content":"<GENERATE_TEXT>"}]
-
-User: "list files"
-Response: [{"intent":"list","filepath":".","content":""}]
 
 User: "how are you today?"
 Response: [{"intent":"none","filepath":"","content":""}]
 
 Only respond with the JSON array, nothing else.`
 
-	fullPrompt := fmt.Sprintf("%s\n\nUser: %s\nResponse:", systemPrompt, prompt)
+	// Build conversation context
+	var contextBuilder strings.Builder
+	if len(history) > 0 {
+		contextBuilder.WriteString("\n\nConversation history (most recent last):\n")
+		for _, msg := range history {
+			contextBuilder.WriteString(fmt.Sprintf("%s: %s\n", msg.Role, msg.Content))
+		}
+	}
+
+	fullPrompt := fmt.Sprintf("%s%s\n\nCurrent user message: %s\nResponse:", systemPrompt, contextBuilder.String(), prompt)
 
 	response, err := pa.llmProvider.Generate(ctx, fullPrompt)
 	if err != nil {
@@ -221,9 +244,66 @@ type FileOperationMatch struct {
 	Content  string
 }
 
-// ExecuteFileOperations executes file operations based on analyzed intents
+// CreateTasksFromMatches converts file operation matches into structured tasks
+func CreateTasksFromMatches(matches []FileOperationMatch) []Task {
+	var tasks []Task
+	for i, match := range matches {
+		taskID := fmt.Sprintf("task_%d", i+1)
+		description := generateTaskDescription(match)
+
+		tasks = append(tasks, Task{
+			ID:          taskID,
+			Description: description,
+			Match:       match,
+			DependsOn:   []string{}, // Dependencies can be added later if needed
+		})
+	}
+	return tasks
+}
+
+// generateTaskDescription creates a human-readable description for a task
+func generateTaskDescription(match FileOperationMatch) string {
+	switch match.Intent {
+	case IntentRead:
+		return fmt.Sprintf("Read file '%s'", match.FilePath)
+	case IntentWrite:
+		if match.Content == "<GENERATE_TEXT>" {
+			return fmt.Sprintf("Generate content and write to '%s'", match.FilePath)
+		}
+		return fmt.Sprintf("Write content to '%s'", match.FilePath)
+	case IntentList:
+		if match.FilePath == "." || match.FilePath == "" {
+			return "List files in current directory"
+		}
+		return fmt.Sprintf("List files in '%s'", match.FilePath)
+	case IntentExists:
+		return fmt.Sprintf("Check if '%s' exists", match.FilePath)
+	case IntentDelete:
+		return fmt.Sprintf("Delete file '%s'", match.FilePath)
+	default:
+		return "Unknown task"
+	}
+}
+
+// ExecuteTasks executes tasks based on analyzed intents
+func (a *Agent) ExecuteTasks(ctx context.Context, tasks []Task) []ToolExecutionResult {
+	return a.ExecuteTasksWithProgress(ctx, tasks, &ConsoleProgressDisplay{})
+}
+
+// ExecuteFileOperations executes file operations based on analyzed intents (legacy compatibility)
 func (a *Agent) ExecuteFileOperations(ctx context.Context, matches []FileOperationMatch) []ToolExecutionResult {
 	return a.ExecuteFileOperationsWithProgress(ctx, matches, &ConsoleProgressDisplay{})
+}
+
+// ExecuteTasksWithProgress executes tasks with custom progress display
+func (a *Agent) ExecuteTasksWithProgress(ctx context.Context, tasks []Task, progressDisplay ProgressDisplay) []ToolExecutionResult {
+	// Convert tasks back to matches for execution (maintaining backward compatibility)
+	var matches []FileOperationMatch
+	for _, task := range tasks {
+		matches = append(matches, task.Match)
+	}
+
+	return a.ExecuteFileOperationsWithProgress(ctx, matches, progressDisplay)
 }
 
 // ExecuteFileOperationsWithProgress executes file operations with custom progress display
