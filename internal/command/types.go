@@ -6,10 +6,11 @@ import (
 
 // Result represents the result of command execution
 type Result struct {
-	Type    string // "response", "model_selector", "provider_selector", "status", "quit", "clear", "request"
+	Type    string // "response", "model_selector", "provider_selector", "status", "quit", "clear", "request", "async"
 	Error   error
-	Content string // Text response content
-	Prompt  string // For "request" type - the prompt to send to LLM
+	Content string        // Text response content
+	Prompt  string        // For "request" type - the prompt to send to LLM
+	AsyncFn func() Result // For "async" type - function to execute asynchronously
 
 	// Type-specific data (only one should be set based on Type)
 	ModelSelector    *ModelSelectorMsg

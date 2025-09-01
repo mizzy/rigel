@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mizzy/rigel/internal/analyzer"
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/history"
 	"github.com/mizzy/rigel/internal/llm"
@@ -34,7 +35,7 @@ func showHelp() Result {
 }
 
 // analyzeRepository analyzes the repository and generates AGENTS.md
-func analyzeRepository() Result {
+func analyzeRepository(llmState *state.LLMState) Result {
 	// Check if AGENTS.md already exists
 	if _, err := os.Stat("AGENTS.md"); err == nil {
 		return Result{
@@ -43,20 +44,49 @@ func analyzeRepository() Result {
 		}
 	}
 
-	start := time.Now()
+	provider := llmState.GetCurrentProvider()
+	if provider == nil {
+		return Result{
+			Type:    "response",
+			Content: "No LLM provider available. Please configure a provider first.",
+			Error:   fmt.Errorf("no provider available"),
+		}
+	}
 
-	// Create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-	_ = ctx // Use context if needed for actual analysis
-
-	// Run analysis (this would need to be injected or made configurable)
-	// For now, return a placeholder
-	duration := time.Since(start)
-
+	// Return async result to show spinner while processing
 	return Result{
-		Type:    "response",
-		Content: fmt.Sprintf("Repository analysis completed in %v.\nAGENTS.md has been generated with project context.", duration),
+		Type: "async",
+		AsyncFn: func() Result {
+			start := time.Now()
+
+			// Create analyzer and run analysis
+			repoAnalyzer := analyzer.NewRepoAnalyzer(provider)
+			content, err := repoAnalyzer.Analyze()
+			if err != nil {
+				return Result{
+					Type:    "response",
+					Content: fmt.Sprintf("Failed to analyze repository: %v", err),
+					Error:   err,
+				}
+			}
+
+			// Write AGENTS.md file
+			err = repoAnalyzer.WriteAgentsFile(content)
+			if err != nil {
+				return Result{
+					Type:    "response",
+					Content: fmt.Sprintf("Failed to write AGENTS.md: %v", err),
+					Error:   err,
+				}
+			}
+
+			duration := time.Since(start)
+
+			return Result{
+				Type:    "response",
+				Content: fmt.Sprintf("Repository analysis completed in %v.\nAGENTS.md has been generated with project context.", duration),
+			}
+		},
 	}
 }
 
