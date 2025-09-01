@@ -52,6 +52,10 @@ func (m Model) View() string {
 
 	// Display input prompt and suggestions
 	if !m.chatState.IsThinking() {
+		// Display repository information above input prompt if available
+		if m.gitInfo != nil {
+			s.WriteString(render.RepoInfo(m.gitInfo.RepoName, m.gitInfo.Branch))
+		}
 		s.WriteString(render.InputPrompt(m.input.View()))
 
 		// Display command completions using render function
