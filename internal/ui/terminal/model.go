@@ -10,6 +10,7 @@ import (
 	"github.com/mizzy/rigel/internal/history"
 	"github.com/mizzy/rigel/internal/llm"
 	"github.com/mizzy/rigel/internal/state"
+	"github.com/mizzy/rigel/internal/ui/handlers"
 )
 
 // Model represents the main chat interface
@@ -37,6 +38,22 @@ type Model struct {
 
 // Exchange represents a single chat exchange - using state.Exchange
 type Exchange = state.Exchange
+
+// getHistoryNavigationState returns the current history navigation state
+func (m *Model) getHistoryNavigationState() *handlers.HistoryNavigationState {
+	return &handlers.HistoryNavigationState{
+		InputHistory: m.inputHistory,
+		HistoryIndex: m.historyIndex,
+		CurrentInput: m.currentInput,
+	}
+}
+
+// updateFromHistoryNavigationState updates the model from history navigation state
+func (m *Model) updateFromHistoryNavigationState(state *handlers.HistoryNavigationState) {
+	m.inputHistory = state.InputHistory
+	m.historyIndex = state.HistoryIndex
+	m.currentInput = state.CurrentInput
+}
 
 // NewModel creates a new chat model instance
 func NewModel(provider llm.Provider, cfg *config.Config) *Model {
