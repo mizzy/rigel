@@ -100,7 +100,7 @@ review, and improve code through natural language interactions.`,
 
 func runChatMode(provider llm.Provider) {
 	model := terminal.NewModel(provider, cfg)
-	p := tea.NewProgram(model)
+	p := tea.NewProgram(model, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 
 	if _, err := p.Run(); err != nil {
 		log.Fatalf("Error running chat: %v", err)
