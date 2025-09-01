@@ -162,8 +162,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.showCompletions = false
 
 					// Handle the command
-					trimmedPrompt := strings.TrimSpace(m.chatState.GetCurrentPrompt())
-					result := command.HandleCommand(trimmedPrompt, m.llmState, m.chatState, m.config, m.historyManager, m.inputHistory)
+					cmdPrompt := m.chatState.GetCurrentPrompt()
+					result := command.HandleCommand(cmdPrompt, m.llmState, m.chatState, m.config, m.historyManager, m.inputHistory)
 					cmd := func() tea.Msg { return result }
 					return m, tea.Batch(cmd, m.spinner.Tick)
 				}
@@ -190,8 +190,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.showCompletions = false
 
 				// Handle commands
-				trimmedPrompt := strings.TrimSpace(m.chatState.GetCurrentPrompt())
-				result := command.HandleCommand(trimmedPrompt, m.llmState, m.chatState, m.config, m.historyManager, m.inputHistory)
+				cmdPrompt := m.chatState.GetCurrentPrompt()
+				result := command.HandleCommand(cmdPrompt, m.llmState, m.chatState, m.config, m.historyManager, m.inputHistory)
 				cmd := func() tea.Msg { return result }
 				return m, tea.Batch(cmd, m.spinner.Tick)
 			}

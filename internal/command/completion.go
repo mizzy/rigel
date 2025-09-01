@@ -15,7 +15,7 @@ func (h *CompletionHandler) UpdateCompletions(inputValue string) ([]string, bool
 	completions := []string{}
 	showCompletions := false
 
-	// Check if the input starts with /
+	// Check if the input starts with / (without leading spaces)
 	if strings.HasPrefix(inputValue, "/") {
 		prefix := strings.ToLower(inputValue)
 		for _, cmd := range AvailableCommands {

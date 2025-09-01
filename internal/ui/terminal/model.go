@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mizzy/rigel/internal/command"
 	"github.com/mizzy/rigel/internal/config"
+	"github.com/mizzy/rigel/internal/git"
 	"github.com/mizzy/rigel/internal/history"
 	"github.com/mizzy/rigel/internal/llm"
 	"github.com/mizzy/rigel/internal/state"
@@ -30,6 +31,7 @@ type Model struct {
 	infoMessage        string
 	historyManager     *history.Manager // Add history manager
 	llmState           *state.LLMState
+	gitInfo            *git.Info // Git repository information
 
 	// Handlers
 	completionHandler *command.CompletionHandler
@@ -100,6 +102,7 @@ func NewModel(provider llm.Provider, cfg *config.Config) *Model {
 		historyIndex:      -1,
 		historyManager:    histManager,
 		llmState:          llmState,
+		gitInfo:           git.GetRepoInfo(),
 		completionHandler: command.NewCompletionHandler(),
 	}
 

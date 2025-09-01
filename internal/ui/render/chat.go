@@ -180,3 +180,33 @@ func InfoMessage(message string) string {
 	}
 	return "\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(message)
 }
+
+// RepoInfo renders repository information (repo name and branch)
+func RepoInfo(repoName, branch string) string {
+	if repoName == "" && branch == "" {
+		return ""
+	}
+
+	var result strings.Builder
+
+	// Repository name in bright blue (Rigel theme color)
+	if repoName != "" {
+		repoStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#5793ff")).
+			Bold(true)
+		result.WriteString(repoStyle.Render(repoName))
+	}
+
+	// Branch name in dim blue with brackets
+	if branch != "" {
+		if repoName != "" {
+			result.WriteString(" ")
+		}
+		branchStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("117")).
+			Italic(true)
+		result.WriteString(branchStyle.Render(fmt.Sprintf("(%s)", branch)))
+	}
+
+	return result.String() + "\n"
+}
