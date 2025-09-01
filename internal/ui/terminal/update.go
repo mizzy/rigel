@@ -249,6 +249,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.chatState.SetError(msg.Error)
 		} else {
 			switch msg.Type {
+			case "async":
+				// Keep thinking state ON and execute async function
+				if msg.AsyncFn != nil {
+					asyncCmd := func() tea.Msg {
+						return msg.AsyncFn()
+					}
+					return m, asyncCmd
+				}
 			case "clear_input_history":
 				// Clear input history
 				m.chatState.SetThinking(false)

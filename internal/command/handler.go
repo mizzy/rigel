@@ -24,7 +24,7 @@ func HandleCommand(command string, llmState *state.LLMState, chatState *state.Ch
 	command = strings.TrimSpace(command)
 	switch command {
 	case "/init":
-		return analyzeRepository()
+		return analyzeRepository(llmState)
 
 	case "/model":
 		return showModelSelector(llmState)
