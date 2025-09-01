@@ -1,4 +1,4 @@
-package terminal
+package handlers
 
 import (
 	"context"
@@ -7,15 +7,22 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mizzy/rigel/internal/llm"
+	"github.com/mizzy/rigel/internal/state"
 )
 
-// requestResponse sends a request to the LLM provider with conversation history
-func (m *Model) requestResponse(prompt string) tea.Cmd {
+// AIResponse represents the response from AI processing
+type AIResponse struct {
+	Content string
+	Error   error
+}
+
+// RequestResponse sends a request to the LLM provider with conversation history
+func RequestResponse(prompt string, llmState *state.LLMState, chatState *state.ChatState) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 
 		// Build message history from chat exchanges
-		history := m.chatState.GetHistory()
+		history := chatState.GetHistory()
 		messages := make([]llm.Message, 0, len(history)*2+1)
 
 		// Add previous exchanges to maintain context
@@ -37,14 +44,14 @@ func (m *Model) requestResponse(prompt string) tea.Cmd {
 		})
 
 		// Use GenerateWithHistory to send full conversation context
-		provider := m.llmState.GetCurrentProvider()
+		provider := llmState.GetCurrentProvider()
 		if provider == nil {
-			return aiResponse{err: fmt.Errorf("no provider available")}
+			return AIResponse{Error: fmt.Errorf("no provider available")}
 		}
 		response, err := provider.GenerateWithHistory(ctx, messages, llm.GenerateOptions{})
 		if err != nil {
-			return aiResponse{err: err}
+			return AIResponse{Error: err}
 		}
-		return aiResponse{content: strings.TrimSpace(response)}
+		return AIResponse{Content: strings.TrimSpace(response)}
 	}
 }

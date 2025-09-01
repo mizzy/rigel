@@ -2,12 +2,6 @@ package terminal
 
 import "github.com/mizzy/rigel/internal/llm"
 
-// aiResponse represents a response from the AI
-type aiResponse struct {
-	content string
-	err     error
-}
-
 // providerSwitchResponse represents a provider switch response
 type providerSwitchResponse struct {
 	provider     llm.Provider
