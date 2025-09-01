@@ -92,9 +92,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.selectedCompletion--
 					}
 				} else {
-					histState := m.getHistoryNavigationState()
+					histState := &handlers.HistoryNavigationState{
+						InputHistory: m.inputHistory,
+						HistoryIndex: m.historyIndex,
+						CurrentInput: m.currentInput,
+					}
 					handlers.NavigateHistory(-1, &m.input, histState)
-					m.updateFromHistoryNavigationState(histState)
+					m.inputHistory = histState.InputHistory
+					m.historyIndex = histState.HistoryIndex
+					m.currentInput = histState.CurrentInput
 				}
 				m.ctrlCPressed = false // Reset Ctrl+C flag
 				m.infoMessage = ""
@@ -105,9 +111,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.selectedCompletion++
 					}
 				} else {
-					histState := m.getHistoryNavigationState()
+					histState := &handlers.HistoryNavigationState{
+						InputHistory: m.inputHistory,
+						HistoryIndex: m.historyIndex,
+						CurrentInput: m.currentInput,
+					}
 					handlers.NavigateHistory(1, &m.input, histState)
-					m.updateFromHistoryNavigationState(histState)
+					m.inputHistory = histState.InputHistory
+					m.historyIndex = histState.HistoryIndex
+					m.currentInput = histState.CurrentInput
 				}
 				m.ctrlCPressed = false // Reset Ctrl+C flag
 				m.infoMessage = ""
