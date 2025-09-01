@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -206,6 +207,11 @@ func (m *MockLLMProvider) Generate(ctx context.Context, prompt string) (string, 
 }
 
 func (m *MockLLMProvider) GenerateWithOptions(ctx context.Context, prompt string, opts llm.GenerateOptions) (string, error) {
+	// Handle intent analysis queries
+	if strings.Contains(prompt, "intent analyzer") {
+		return `[{"intent":"none","filepath":"","content":""}]`, nil
+	}
+
 	if len(m.multiResponse) > 0 {
 		response := m.multiResponse[m.callCount%len(m.multiResponse)]
 		m.callCount++

@@ -16,7 +16,7 @@ func (m *MockLLMProvider) Generate(ctx context.Context, prompt string) (string, 
 func TestNewPromptAnalyzer(t *testing.T) {
 	mockProvider := &MockLLMProvider{}
 	analyzer := NewPromptAnalyzer(mockProvider)
-	
+
 	if analyzer == nil {
 		t.Error("NewPromptAnalyzer should not return nil")
 	}
