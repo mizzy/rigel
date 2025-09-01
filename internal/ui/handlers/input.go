@@ -1,8 +1,10 @@
 package handlers
 
-import (
-	"github.com/charmbracelet/bubbles/textarea"
-)
+// InputUpdater is an interface for updating input values
+type InputUpdater interface {
+	Value() string
+	SetValue(string)
+}
 
 // HistoryNavigationState holds the state needed for history navigation
 type HistoryNavigationState struct {
@@ -12,7 +14,7 @@ type HistoryNavigationState struct {
 }
 
 // NavigateHistory navigates through input history and updates the input field
-func NavigateHistory(direction int, input *textarea.Model, state *HistoryNavigationState) {
+func NavigateHistory(direction int, input InputUpdater, state *HistoryNavigationState) {
 	if len(state.InputHistory) == 0 {
 		return
 	}
