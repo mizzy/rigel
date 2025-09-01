@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -9,9 +10,11 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mizzy/rigel/internal/agent"
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/llm"
 	"github.com/mizzy/rigel/internal/sandbox"
+	"github.com/mizzy/rigel/internal/tools"
 	"github.com/mizzy/rigel/internal/ui/terminal"
 	"github.com/mizzy/rigel/internal/version"
 	"github.com/spf13/cobra"
@@ -84,13 +87,19 @@ review, and improve code through natural language interactions.`,
 				os.Exit(1)
 			}
 
-			// Generate response for the prompt
-			response, err := provider.Generate(cmd.Context(), prompt)
+			// Create intelligent agent with file tools for pipe mode
+			intelligentAgent := agent.New(provider)
+			fileTool := tools.NewFileTool()
+			intelligentAgent.RegisterTool(fileTool)
+
+			// Generate response using agent
+			response, err := intelligentAgent.Execute(context.Background(), prompt)
 			if err != nil {
 				log.Fatalf("Failed to generate response: %v", err)
 			}
 
 			fmt.Print(response)
+			os.Stdout.Sync() // Ensure output is flushed
 		} else {
 			// Run interactive chat mode (inline, no alternate screen)
 			runChatMode(provider)

@@ -10,9 +10,12 @@ import (
 )
 
 type Agent struct {
-	provider llm.Provider
-	tools    []tools.Tool
-	memory   *Memory
+	provider        llm.Provider
+	tools           []tools.Tool
+	memory          *Memory
+	promptAnalyzer  *PromptAnalyzer
+	autoToolEnabled bool
+	progressDisplay ProgressDisplay
 }
 
 type Memory struct {
@@ -32,7 +35,10 @@ func New(provider llm.Provider) *Agent {
 			conversationHistory: []Message{},
 			context:             make(map[string]interface{}),
 		},
-		tools: []tools.Tool{},
+		tools:           []tools.Tool{},
+		promptAnalyzer:  NewPromptAnalyzer(provider),
+		autoToolEnabled: true,
+		progressDisplay: &ConsoleProgressDisplay{},
 	}
 }
 
@@ -41,18 +47,81 @@ func (a *Agent) RegisterTool(tool tools.Tool) {
 }
 
 func (a *Agent) Execute(ctx context.Context, task string) (string, error) {
-	systemPrompt := a.buildSystemPrompt()
+	var toolResults []ToolExecutionResult
+	var finalResponse strings.Builder
 
+	// Analyze prompt for file operations if auto-tool is enabled
+	if a.autoToolEnabled {
+		matches := a.promptAnalyzer.AnalyzePrompt(task)
+		if len(matches) > 0 {
+			finalResponse.WriteString("I'll help you with that. Let me execute the necessary file operations:\n\n")
+
+			// Process matches and generate content if needed
+			for i, match := range matches {
+				if match.Intent == IntentWrite && match.Content == "<GENERATE_TEXT>" {
+					// Generate content using LLM
+					contentPrompt := fmt.Sprintf("Generate appropriate content for a file based on this user request: %s\n\nProvide only the content to be written, no explanations.", task)
+					generatedContent, err := a.provider.Generate(ctx, contentPrompt)
+					if err == nil {
+						matches[i].Content = strings.TrimSpace(generatedContent)
+					} else {
+						matches[i].Content = "Sample text generated for user request."
+					}
+				}
+			}
+
+			// If using UIProgressDisplay, include progress messages first
+			if uiDisplay, ok := a.progressDisplay.(*UIProgressDisplay); ok {
+				// Execute with progress tracking
+				toolResults = a.ExecuteFileOperationsWithProgress(ctx, matches, a.progressDisplay)
+
+				// Add progress messages
+				progressMessages := uiDisplay.GetAllMessages()
+				if len(progressMessages) > 0 {
+					finalResponse.WriteString(strings.Join(progressMessages, "\n"))
+					finalResponse.WriteString("\n\n")
+				}
+			} else {
+				// Execute without UI progress display
+				toolResults = a.ExecuteFileOperationsWithProgress(ctx, matches, a.progressDisplay)
+			}
+
+			// Build response with tool results (detailed output)
+			finalResponse.WriteString("Results:\n")
+			for _, result := range toolResults {
+				if result.Error == nil && result.Output != "" {
+					finalResponse.WriteString(fmt.Sprintf("📄 %s output:\n%s\n\n", result.Tool, result.Output))
+				}
+			}
+		}
+	}
+
+	// Generate AI response
+	systemPrompt := a.buildSystemPrompt()
 	opts := llm.GenerateOptions{
 		SystemPrompt: systemPrompt,
 		Temperature:  0.7,
 	}
 
-	userPrompt := a.buildUserPrompt(task)
+	// Include tool results in the prompt if available
+	var userPrompt string
+	if len(toolResults) > 0 {
+		toolContext := a.buildToolContext(toolResults)
+		userPrompt = fmt.Sprintf("%s\n\nTool execution results:\n%s", a.buildUserPrompt(task), toolContext)
+	} else {
+		userPrompt = a.buildUserPrompt(task)
+	}
 
 	response, err := a.provider.GenerateWithOptions(ctx, userPrompt, opts)
 	if err != nil {
 		return "", fmt.Errorf("failed to execute task: %w", err)
+	}
+
+	// Combine tool results and AI response
+	if finalResponse.Len() > 0 {
+		finalResponse.WriteString("---\n\n")
+		finalResponse.WriteString(response)
+		response = finalResponse.String()
 	}
 
 	a.memory.conversationHistory = append(a.memory.conversationHistory,
@@ -106,4 +175,37 @@ func (a *Agent) SetContext(key string, value interface{}) {
 func (a *Agent) GetContext(key string) (interface{}, bool) {
 	val, ok := a.memory.context[key]
 	return val, ok
+}
+
+// SetAutoToolEnabled enables or disables automatic tool execution
+func (a *Agent) SetAutoToolEnabled(enabled bool) {
+	a.autoToolEnabled = enabled
+}
+
+// IsAutoToolEnabled returns whether automatic tool execution is enabled
+func (a *Agent) IsAutoToolEnabled() bool {
+	return a.autoToolEnabled
+}
+
+// SetProgressDisplay sets a custom progress display implementation
+func (a *Agent) SetProgressDisplay(display ProgressDisplay) {
+	a.progressDisplay = display
+}
+
+// GetProgressDisplay returns the current progress display implementation
+func (a *Agent) GetProgressDisplay() ProgressDisplay {
+	return a.progressDisplay
+}
+
+// buildToolContext builds context from tool execution results
+func (a *Agent) buildToolContext(results []ToolExecutionResult) string {
+	var context []string
+	for _, result := range results {
+		if result.Error != nil {
+			context = append(context, fmt.Sprintf("Tool %s failed: %v", result.Tool, result.Error))
+		} else {
+			context = append(context, fmt.Sprintf("Tool %s succeeded: %s", result.Tool, result.Output))
+		}
+	}
+	return strings.Join(context, "\n")
 }

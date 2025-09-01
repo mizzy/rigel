@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mizzy/rigel/internal/agent"
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/llm"
 	"github.com/mizzy/rigel/internal/state"
@@ -15,6 +16,19 @@ import (
 type AIResponse struct {
 	Content string
 	Error   error
+}
+
+// RequestResponseWithAgent sends a request using the intelligent agent
+func RequestResponseWithAgent(prompt string, agentInstance *agent.Agent) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+
+		response, err := agentInstance.Execute(ctx, prompt)
+		if err != nil {
+			return AIResponse{Error: err}
+		}
+		return AIResponse{Content: strings.TrimSpace(response)}
+	}
 }
 
 // RequestResponse sends a request to the LLM provider with conversation history
