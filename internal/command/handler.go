@@ -12,6 +12,16 @@ import (
 // HandleCommand processes a command and returns the result
 // This function is stateless and doesn't need a Handler struct
 func HandleCommand(command string, llmState *state.LLMState, chatState *state.ChatState, cfg *config.Config, historyManager *history.Manager, inputHistory []string) Result {
+	// Only treat as command if it starts with / without any leading whitespace
+	if !strings.HasPrefix(command, "/") {
+		return Result{
+			Type:   "request",
+			Prompt: command,
+		}
+	}
+
+	// Use trimmed version for command processing
+	command = strings.TrimSpace(command)
 	switch command {
 	case "/init":
 		return analyzeRepository()
