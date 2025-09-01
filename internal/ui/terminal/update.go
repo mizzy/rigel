@@ -244,40 +244,46 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case command.Result:
-		m.chatState.SetThinking(false)
 		if msg.Error != nil {
+			m.chatState.SetThinking(false)
 			m.chatState.SetError(msg.Error)
 		} else {
 			switch msg.Type {
 			case "clear_input_history":
 				// Clear input history
+				m.chatState.SetThinking(false)
 				m.inputHistory = []string{}
 				m.historyIndex = -1
 				m.currentInput = ""
 				m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), "Command history cleared successfully.")
 				m.chatState.ClearCurrentPrompt()
 			case "request":
-				// Handle normal prompts (non-commands)
+				// Handle normal prompts (non-commands) - keep thinking state ON
 				return m, handlers.RequestResponse(msg.Prompt, m.llmState, m.chatState)
 			case "model_selector":
+				m.chatState.SetThinking(false)
 				if msg.ModelSelector != nil {
 					return m, func() tea.Msg { return *msg.ModelSelector }
 				}
 			case "provider_selector":
+				m.chatState.SetThinking(false)
 				if msg.ProviderSelector != nil {
 					return m, func() tea.Msg { return *msg.ProviderSelector }
 				}
 			case "status":
+				m.chatState.SetThinking(false)
 				if msg.StatusInfo != nil {
 					return m, func() tea.Msg { return *msg.StatusInfo }
 				}
 			case "quit":
+				m.chatState.SetThinking(false)
 				m.quitting = true
 				return m, tea.Quit
 			case "clear":
-				// Clear handled above by SetThinking(false)
+				m.chatState.SetThinking(false)
 				return m, nil
 			default:
+				m.chatState.SetThinking(false)
 				if msg.Content != "" {
 					m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), msg.Content)
 					m.chatState.ClearCurrentPrompt()

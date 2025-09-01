@@ -74,7 +74,7 @@ func NewModel(provider llm.Provider, cfg *config.Config) *Model {
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("87")) // Match Rigel blue
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("87")).Bold(true) // Same as prompt symbol
 
 	// Initialize history manager
 	histManager, err := history.NewManager()
