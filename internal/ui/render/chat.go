@@ -16,6 +16,7 @@ type Exchange struct {
 
 var (
 	promptSymbol    = lipgloss.NewStyle().Foreground(lipgloss.Color("87")).Bold(true).Render("✦")
+	promptStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("87")).Bold(true)
 	inputStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("195"))
 	outputStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	thinkingStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("117")).Italic(true)
@@ -80,11 +81,40 @@ func ThinkingState(currentPrompt string, spinner string) string {
 	s.WriteString(promptSymbol)
 	s.WriteString(" ")
 
-	promptStyle := inputStyle.Width(promptWidth)
-	s.WriteString(promptStyle.Render(currentPrompt))
+	promptLineStyle := inputStyle.Width(promptWidth)
+	s.WriteString(promptLineStyle.Render(currentPrompt))
 	s.WriteString("\n\n")
-	s.WriteString(spinner)
+	s.WriteString(promptStyle.Render(spinner))
 	s.WriteString(thinkingStyle.Render(" Thinking..."))
+	s.WriteString("\n")
+
+	return s.String()
+}
+
+// ThinkingStateWithInput renders the thinking indicator with preserved input
+func ThinkingStateWithInput(inputView string, spinner string) string {
+	var s strings.Builder
+
+	// Show input with prompt symbol
+	s.WriteString(promptSymbol)
+	s.WriteString(" ")
+
+	// Handle multi-line alignment by replacing newlines with proper indentation
+	lines := strings.Split(inputView, "\n")
+	for i, line := range lines {
+		if i > 0 {
+			s.WriteString("\n  ") // 2 spaces to align with prompt symbol + space
+		}
+		s.WriteString(line)
+	}
+
+	// Add thinking indicator
+	s.WriteString("\n\n")
+	if spinner != "" {
+		s.WriteString(promptStyle.Render(spinner))
+		s.WriteString(" ")
+	}
+	s.WriteString(thinkingStyle.Render("Thinking..."))
 	s.WriteString("\n")
 
 	return s.String()
@@ -138,10 +168,45 @@ func ErrorMessage(err error) string {
 	return "\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render(fmt.Sprintf("Error: %v", err))
 }
 
+// ThinkingText renders just the thinking text without prompt
+func ThinkingText() string {
+	return thinkingStyle.Render(" Thinking...")
+}
+
 // InfoMessage renders info messages
 func InfoMessage(message string) string {
 	if message == "" {
 		return ""
 	}
 	return "\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(message)
+}
+
+// RepoInfo renders repository information (repo name and branch)
+func RepoInfo(repoName, branch string) string {
+	if repoName == "" && branch == "" {
+		return ""
+	}
+
+	var result strings.Builder
+
+	// Repository name in bright blue (Rigel theme color)
+	if repoName != "" {
+		repoStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#5793ff")).
+			Bold(true)
+		result.WriteString(repoStyle.Render(repoName))
+	}
+
+	// Branch name in dim blue with brackets
+	if branch != "" {
+		if repoName != "" {
+			result.WriteString(" ")
+		}
+		branchStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("117")).
+			Italic(true)
+		result.WriteString(branchStyle.Render(fmt.Sprintf("(%s)", branch)))
+	}
+
+	return result.String() + "\n"
 }

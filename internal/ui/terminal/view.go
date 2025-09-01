@@ -28,21 +28,34 @@ func (m Model) View() string {
 
 	// Display provider selection interface if in provider selection mode
 	if m.llmState.IsProviderSelectionActive() {
-		return render.ProviderSelector(m.llmState.GetAvailableProviders(), m.llmState.GetSelectedProviderIndex())
+		s.WriteString(render.ProviderSelector(m.llmState.GetAvailableProviders(), m.llmState.GetSelectedProviderIndex()))
+		s.WriteString(render.InfoMessage(m.infoMessage))
+		s.WriteString(render.ErrorMessage(m.chatState.GetError()))
+		return s.String()
 	}
 
 	// Display model selection interface if in model selection mode
 	if m.llmState.IsModelSelectionActive() {
-		return render.ModelSelector(m.llmState.GetFilteredModels(), m.llmState.GetSelectedModelIndex(), m.llmState.GetModelFilter())
+		s.WriteString(render.ModelSelector(m.llmState.GetFilteredModels(), m.llmState.GetSelectedModelIndex(), m.llmState.GetModelFilter()))
+		s.WriteString(render.InfoMessage(m.infoMessage))
+		s.WriteString(render.ErrorMessage(m.chatState.GetError()))
+		return s.String()
 	}
 
 	// Display thinking state
 	if m.chatState.IsThinking() {
 		s.WriteString(render.ThinkingState(m.chatState.GetCurrentPrompt(), m.spinner.View()))
+		s.WriteString(render.InfoMessage(m.infoMessage))
+		s.WriteString(render.ErrorMessage(m.chatState.GetError()))
+		return s.String()
 	}
 
 	// Display input prompt and suggestions
 	if !m.chatState.IsThinking() {
+		// Display repository information above input prompt if available
+		if m.gitInfo != nil {
+			s.WriteString(render.RepoInfo(m.gitInfo.RepoName, m.gitInfo.Branch))
+		}
 		s.WriteString(render.InputPrompt(m.input.View()))
 
 		// Display command completions using render function
