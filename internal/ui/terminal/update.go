@@ -19,12 +19,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		// Handle provider selection mode
 		if m.llmState.IsProviderSelectionActive() {
-			return m.handleProviderSelectionKey(msg)
+			result := handlers.HandleProviderSelectionKey(msg, m.llmState, m.chatState, m.config)
+			if result.ShouldSwitch {
+				return m, result.SwitchCmd
+			}
+			return m, nil
 		}
 
 		// Handle model selection mode
 		if m.llmState.IsModelSelectionActive() {
-			return m.handleModelSelectionKey(msg)
+			result := handlers.HandleModelSelectionKey(msg, m.llmState, m.chatState, &m.input)
+			if result.InputValue != "" || result.Placeholder != "" {
+				if result.InputValue != "" {
+					m.input.SetValue(result.InputValue)
+				}
+				if result.Placeholder != "" {
+					m.input.Placeholder = result.Placeholder
+				}
+			}
+			if result.ShouldSwitch {
+				return m, result.SwitchCmd
+			}
+			return m, nil
 		}
 
 		// Handle special keys first
@@ -305,10 +321,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.chatState.ClearCurrentPrompt()
 		return m, nil
 
-	case providerSwitchResponse:
-		m.llmState.SetCurrentProvider(msg.provider)
+	case handlers.ProviderSwitchResponse:
+		m.llmState.SetCurrentProvider(msg.Provider)
 		m.chatState.SetThinking(false)
-		response := fmt.Sprintf("Switched to provider: %s\nCurrent model: %s", msg.providerName, m.llmState.GetCurrentModel().Name)
+		response := fmt.Sprintf("Switched to provider: %s\nCurrent model: %s", msg.ProviderName, m.llmState.GetCurrentModel().Name)
 		m.chatState.AddExchange(m.chatState.GetCurrentPrompt(), response)
 		m.chatState.ClearCurrentPrompt()
 		return m, nil
