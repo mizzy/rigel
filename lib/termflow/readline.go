@@ -5,6 +5,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -17,9 +18,10 @@ type LineEditor struct {
 	line             string
 	cursor           int
 	prompt           string
-	ctrlCPressed     bool // Track first Ctrl+C press for two-press exit
-	exitMessageShown bool // Track if exit message is shown below current line
-	cursorOnExitLine bool // Track if cursor is positioned on the line above exit message
+	ctrlCPressed     bool        // Track first Ctrl+C press for two-press exit
+	exitMessageShown bool        // Track if exit message is shown below current line
+	cursorOnExitLine bool        // Track if cursor is positioned on the line above exit message
+	ctrlCTimer       *time.Timer // Timer to reset Ctrl+C state after 1 second
 }
 
 // NewLineEditor creates a new line editor
@@ -80,6 +82,9 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 			le.exitMessageShown = false
 			le.cursorOnExitLine = false
 
+			// Stop timer if running
+			le.stopCtrlCTimer()
+
 			// Add to history if not empty and different from last entry
 			if strings.TrimSpace(result) != "" {
 				le.addToHistory(result)
@@ -90,6 +95,7 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 		case KeyCtrlC:
 			if le.ctrlCPressed {
 				// Second Ctrl+C - return interrupted error to exit
+				le.stopCtrlCTimer()
 				return "", fmt.Errorf("interrupted")
 			}
 			// First Ctrl+C - show exit message below, then move cursor back up
@@ -107,6 +113,9 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 			fmt.Fprintf(le.client.output, "\033[1A")
 			// Position cursor after prompt + current cursor position
 			fmt.Fprintf(le.client.output, "\r\033[%dC", visibleLength(le.prompt)+le.cursor)
+
+			// Start 1-second timer to reset Ctrl+C state and clear message
+			le.startCtrlCTimer()
 			continue // Continue input loop instead of returning
 
 		case KeyCtrlD:
@@ -280,6 +289,9 @@ func (le *LineEditor) ReadLineWithoutPrompt() (string, error) {
 			le.exitMessageShown = false
 			le.cursorOnExitLine = false
 
+			// Stop timer if running
+			le.stopCtrlCTimer()
+
 			// Add to history if not empty and different from last entry
 			if strings.TrimSpace(result) != "" {
 				le.addToHistory(result)
@@ -290,6 +302,7 @@ func (le *LineEditor) ReadLineWithoutPrompt() (string, error) {
 		case KeyCtrlC:
 			if le.ctrlCPressed {
 				// Second Ctrl+C - return interrupted error to exit
+				le.stopCtrlCTimer()
 				return "", fmt.Errorf("interrupted")
 			}
 			// First Ctrl+C - show exit message below, then move cursor back up
@@ -307,6 +320,9 @@ func (le *LineEditor) ReadLineWithoutPrompt() (string, error) {
 			fmt.Fprintf(le.client.output, "\033[1A")
 			// Position cursor after prompt + current cursor position
 			fmt.Fprintf(le.client.output, "\r\033[%dC", visibleLength(le.prompt)+le.cursor)
+
+			// Start 1-second timer to reset Ctrl+C state and clear message
+			le.startCtrlCTimer()
 			continue // Continue input loop instead of returning
 
 		case KeyCtrlD:
@@ -399,5 +415,35 @@ func (le *LineEditor) addToHistory(command string) {
 	maxHistory := 1000
 	if len(le.history) > maxHistory {
 		le.history = le.history[1:]
+	}
+}
+
+// startCtrlCTimer starts a 1-second timer to reset Ctrl+C state and clear exit message
+func (le *LineEditor) startCtrlCTimer() {
+	// Stop any existing timer first
+	le.stopCtrlCTimer()
+
+	le.ctrlCTimer = time.AfterFunc(1*time.Second, func() {
+		// Reset Ctrl+C state
+		le.ctrlCPressed = false
+		le.exitMessageShown = false
+		le.cursorOnExitLine = false
+
+		// Clear the exit message by redrawing the display
+		// Move cursor down to the exit message line and clear it
+		fmt.Fprint(le.client.output, "\033[1B")  // Move down 1 line to the exit message
+		fmt.Fprint(le.client.output, "\r\033[K") // Clear the line
+
+		// Move back up to the original prompt line and reposition cursor
+		fmt.Fprint(le.client.output, "\033[1A") // Move up 1 line
+		fmt.Fprintf(le.client.output, "\r\033[%dC", visibleLength(le.prompt)+le.cursor)
+	})
+}
+
+// stopCtrlCTimer stops the Ctrl+C reset timer if it's running
+func (le *LineEditor) stopCtrlCTimer() {
+	if le.ctrlCTimer != nil {
+		le.ctrlCTimer.Stop()
+		le.ctrlCTimer = nil
 	}
 }
