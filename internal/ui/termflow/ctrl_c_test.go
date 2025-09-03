@@ -15,6 +15,11 @@ func TestCtrlCBehavior(t *testing.T) {
 		t.Skip("Skipping terminal integration test in short mode")
 	}
 
+	// Skip if no terminal is available (CI environment)
+	if os.Getenv("CI") != "" || os.Getenv("GITHUB_ACTIONS") != "" {
+		t.Skip("Skipping terminal integration test in CI environment")
+	}
+
 	// Set test mode and provider environment variables
 	oldTestEnv := os.Getenv("RIGEL_TEST_MODE")
 	oldProvider := os.Getenv("PROVIDER")

@@ -103,13 +103,45 @@ func (tt *TerminalTest) GetOutput() string {
 
 // GetVisibleOutput returns the output with ANSI escape sequences stripped
 func (tt *TerminalTest) GetVisibleOutput() string {
+	raw := tt.output.String()
+
+	// Process carriage returns correctly - simulate overwriting
+	processed := tt.processCarriageReturns(raw)
+
 	// Remove ANSI escape sequences
 	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
-	clean := ansiRegex.ReplaceAllString(tt.output.String(), "")
+	clean := ansiRegex.ReplaceAllString(processed, "")
 
-	// Remove carriage returns and clean up
-	clean = strings.ReplaceAll(clean, "\r", "")
 	return clean
+}
+
+// processCarriageReturns simulates how carriage returns work in real terminals
+func (tt *TerminalTest) processCarriageReturns(input string) string {
+	lines := strings.Split(input, "\n")
+	var result []string
+
+	for _, line := range lines {
+		if strings.Contains(line, "\r") {
+			// Handle sequences like "\r\033[K..." (clear line and rewrite)
+			if strings.Contains(line, "\r\033[K") {
+				parts := strings.Split(line, "\r\033[K")
+				// Keep everything before the first \r\033[K, then the last part overwrites
+				if len(parts) > 1 {
+					result = append(result, parts[len(parts)-1])
+				} else {
+					result = append(result, line)
+				}
+			} else {
+				// Regular \r without clear - just remove \r
+				cleaned := strings.ReplaceAll(line, "\r", "")
+				result = append(result, cleaned)
+			}
+		} else {
+			result = append(result, line)
+		}
+	}
+
+	return strings.Join(result, "\n")
 }
 
 // ExpectOutput checks if the terminal contains expected text
