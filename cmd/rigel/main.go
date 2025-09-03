@@ -15,6 +15,7 @@ import (
 	"github.com/mizzy/rigel/internal/llm"
 	"github.com/mizzy/rigel/internal/sandbox"
 	"github.com/mizzy/rigel/internal/tools"
+	termflowui "github.com/mizzy/rigel/internal/ui/termflow"
 	"github.com/mizzy/rigel/internal/ui/terminal"
 	"github.com/mizzy/rigel/internal/version"
 	"github.com/spf13/cobra"
@@ -24,6 +25,7 @@ var (
 	cfg           *config.Config
 	sandboxFlag   bool
 	noSandboxFlag bool
+	termflowFlag  bool
 )
 
 func main() {
@@ -66,9 +68,10 @@ review, and improve code through natural language interactions.`,
 			log.Fatalf("Failed to initialize LLM provider: %v", err)
 		}
 
-		// Check if input is piped
+		// Check if input is piped (skip check in test mode)
 		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
+		isTestMode := os.Getenv("RIGEL_TEST_MODE") == "1"
+		if !isTestMode && (stat.Mode()&os.ModeCharDevice) == 0 {
 			// Handle piped input - no interactive commands in pipe mode
 			input, err := io.ReadAll(os.Stdin)
 			if err != nil {
@@ -101,8 +104,13 @@ review, and improve code through natural language interactions.`,
 			fmt.Print(response)
 			os.Stdout.Sync() // Ensure output is flushed
 		} else {
-			// Run interactive chat mode (inline, no alternate screen)
-			runChatMode(provider)
+			// Choose chat mode based on flag
+			if termflowFlag {
+				runTermflowChatMode(provider)
+			} else {
+				// Run interactive chat mode (inline, no alternate screen)
+				runChatMode(provider)
+			}
 		}
 	},
 }
@@ -116,10 +124,22 @@ func runChatMode(provider llm.Provider) {
 	}
 }
 
+func runTermflowChatMode(provider llm.Provider) {
+	session, err := termflowui.NewChatSession(provider, cfg)
+	if err != nil {
+		log.Fatalf("Failed to create termflow chat session: %v", err)
+	}
+
+	if err := session.Run(); err != nil {
+		log.Fatalf("Error running termflow chat: %v", err)
+	}
+}
+
 func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.Flags().BoolVar(&sandboxFlag, "sandbox", false, "Force enable sandbox mode (default on macOS)")
 	rootCmd.Flags().BoolVar(&noSandboxFlag, "no-sandbox", false, "Disable sandbox mode explicitly")
+	rootCmd.Flags().BoolVar(&termflowFlag, "termflow", false, "Use termflow UI instead of bubbletea (preserves terminal scrollback)")
 }
 
 func shouldEnableSandboxByDefault() bool {
