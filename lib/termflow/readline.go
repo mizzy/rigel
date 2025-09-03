@@ -3,18 +3,23 @@ package termflow
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 // LineEditor provides line editing with history navigation
 type LineEditor struct {
-	client       *Client
-	keyboard     *KeyboardReader
-	history      []string
-	historyIndex int
-	line         string
-	cursor       int
-	prompt       string
+	client           *Client
+	keyboard         *KeyboardReader
+	history          []string
+	historyIndex     int
+	line             string
+	cursor           int
+	prompt           string
+	ctrlCPressed     bool // Track first Ctrl+C press for two-press exit
+	exitMessageShown bool // Track if exit message is shown below current line
+	cursorOnExitLine bool // Track if cursor is positioned on the line above exit message
 }
 
 // NewLineEditor creates a new line editor
@@ -70,6 +75,11 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 			fmt.Fprint(le.client.output, "\n")
 			result := le.line
 
+			// Reset flags when completing input
+			le.ctrlCPressed = false
+			le.exitMessageShown = false
+			le.cursorOnExitLine = false
+
 			// Add to history if not empty and different from last entry
 			if strings.TrimSpace(result) != "" {
 				le.addToHistory(result)
@@ -78,9 +88,26 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 			return result, nil
 
 		case KeyCtrlC:
-			// Clear current line and move to next line cleanly
-			fmt.Fprint(le.client.output, "\r\033[K\n")
-			return "", fmt.Errorf("interrupted")
+			if le.ctrlCPressed {
+				// Second Ctrl+C - return interrupted error to exit
+				return "", fmt.Errorf("interrupted")
+			}
+			// First Ctrl+C - show exit message below, then move cursor back up
+			le.ctrlCPressed = true
+			le.exitMessageShown = true
+			le.cursorOnExitLine = true
+			// Clear any existing input display
+			fmt.Fprint(le.client.output, "\r\033[K")
+			// Redraw prompt and current line
+			fmt.Fprint(le.client.output, le.prompt)
+			fmt.Fprint(le.client.output, le.line)
+			// Show exit message on the next line, always starting from the beginning
+			fmt.Fprintf(le.client.output, "\n\r\033[38;5;240m(Press Ctrl+C again to exit)\033[0m")
+			// Move cursor back up to the prompt line, at the correct position
+			fmt.Fprintf(le.client.output, "\033[1A")
+			// Position cursor after prompt + current cursor position
+			fmt.Fprintf(le.client.output, "\r\033[%dC", visibleLength(le.prompt)+le.cursor)
+			continue // Continue input loop instead of returning
 
 		case KeyCtrlD:
 			if len(le.line) == 0 {
@@ -113,6 +140,7 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 
 		case KeyRune:
 			le.insertRune(key.Rune)
+			// Don't reset cursorOnExitLine immediately, let refreshDisplay handle it
 
 		default:
 			// Ignore unknown keys
@@ -194,16 +222,12 @@ func (le *LineEditor) navigateHistory(direction int) {
 
 // refreshDisplay redraws the current line
 func (le *LineEditor) refreshDisplay() {
-	// Clear the current line
+	// Normal display logic - cursor is already positioned correctly after Ctrl+C
 	fmt.Fprint(le.client.output, "\r\033[K")
-
-	// Print prompt and current line
 	fmt.Fprint(le.client.output, le.prompt)
 	fmt.Fprint(le.client.output, le.line)
-
 	// Position cursor correctly
 	if le.cursor < len(le.line) {
-		// Move cursor to correct position
 		fmt.Fprintf(le.client.output, "\033[%dD", len(le.line)-le.cursor)
 	}
 }
@@ -251,6 +275,11 @@ func (le *LineEditor) ReadLineWithoutPrompt() (string, error) {
 			fmt.Fprint(le.client.output, "\n")
 			result := le.line
 
+			// Reset flags when completing input
+			le.ctrlCPressed = false
+			le.exitMessageShown = false
+			le.cursorOnExitLine = false
+
 			// Add to history if not empty and different from last entry
 			if strings.TrimSpace(result) != "" {
 				le.addToHistory(result)
@@ -259,9 +288,26 @@ func (le *LineEditor) ReadLineWithoutPrompt() (string, error) {
 			return result, nil
 
 		case KeyCtrlC:
-			// Clear current line and move to next line cleanly
-			fmt.Fprint(le.client.output, "\r\033[K\n")
-			return "", fmt.Errorf("interrupted")
+			if le.ctrlCPressed {
+				// Second Ctrl+C - return interrupted error to exit
+				return "", fmt.Errorf("interrupted")
+			}
+			// First Ctrl+C - show exit message below, then move cursor back up
+			le.ctrlCPressed = true
+			le.exitMessageShown = true
+			le.cursorOnExitLine = true
+			// Clear any existing input display
+			fmt.Fprint(le.client.output, "\r\033[K")
+			// Redraw prompt and current line
+			fmt.Fprint(le.client.output, le.prompt)
+			fmt.Fprint(le.client.output, le.line)
+			// Show exit message on the next line, always starting from the beginning
+			fmt.Fprintf(le.client.output, "\n\r\033[38;5;240m(Press Ctrl+C again to exit)\033[0m")
+			// Move cursor back up to the prompt line, at the correct position
+			fmt.Fprintf(le.client.output, "\033[1A")
+			// Position cursor after prompt + current cursor position
+			fmt.Fprintf(le.client.output, "\r\033[%dC", visibleLength(le.prompt)+le.cursor)
+			continue // Continue input loop instead of returning
 
 		case KeyCtrlD:
 			if le.line == "" {
@@ -329,6 +375,15 @@ func (le *LineEditor) ReadLineWithoutPrompt() (string, error) {
 			le.refreshDisplayWithoutPrompt()
 		}
 	}
+}
+
+// visibleLength calculates the visible length of a string by removing ANSI escape sequences
+func visibleLength(s string) int {
+	// Remove ANSI escape sequences
+	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*[mK]`)
+	cleaned := ansiRegex.ReplaceAllString(s, "")
+	// Count Unicode runes (characters) not bytes
+	return utf8.RuneCountInString(cleaned)
 }
 
 // addToHistory adds a command to the history

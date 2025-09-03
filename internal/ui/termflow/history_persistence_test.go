@@ -2,26 +2,12 @@ package termflow
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/mizzy/rigel/lib/termflow/uitest"
 )
-
-// buildTestBinary builds the test binary if it doesn't exist
-func buildTestBinary() error {
-	// Check if binary already exists
-	if _, err := os.Stat("/tmp/rigel-test"); err == nil {
-		return nil
-	}
-
-	// Build the binary
-	cmd := exec.Command("go", "build", "-o", "/tmp/rigel-test", "cmd/rigel/main.go")
-	cmd.Env = append(os.Environ(), "PROVIDER=ollama")
-	return cmd.Run()
-}
 
 // TestHistoryPersistenceAcrossSessions tests that commands from one session are available in the next
 func TestHistoryPersistenceAcrossSessions(t *testing.T) {

@@ -26,7 +26,6 @@ type ChatSession struct {
 	config         *config.Config
 	gitInfo        *git.Info
 	ctrlCPressed   bool // Track Ctrl+C presses for 2-press exit
-	waitingForExit bool // Waiting for second Ctrl+C, don't show prompt
 }
 
 // NewChatSession creates a new termflow chat session
@@ -110,30 +109,14 @@ func (cs *ChatSession) Run() error {
 		var input string
 		var err error
 
-		// If waiting for exit, use a different input method that doesn't show prompt
-		if cs.waitingForExit {
-			// Reset the waiting flag and use raw keyboard input
-			cs.waitingForExit = false
-			input, err = cs.readRawInput()
-		} else {
-			// Use ReadLineOrMultiLine to support both single and multi-line input
-			input, err = cs.client.ReadLineOrMultiLine()
-		}
+		// Use ReadLineOrMultiLine to support both single and multi-line input
+		input, err = cs.client.ReadLineOrMultiLine()
 
 		if err != nil {
-			// Handle interruption with 2-press exit behavior
+			// Handle interruption - line editor handles two-press behavior internally
 			if err.Error() == "interrupted" {
-				if cs.ctrlCPressed {
-					// Second Ctrl+C - exit
-					cs.client.ShowInfo("Goodbye!")
-					break
-				}
-				// First Ctrl+C - show message and set flag
-				cs.ctrlCPressed = true
-				cs.waitingForExit = true
-				cs.client.ShowInfo("Press Ctrl+C again to exit")
-				// Continue the loop but don't show prompt - wait for second Ctrl+C
-				continue
+				cs.client.ShowInfo("Goodbye!")
+				break
 			}
 			cs.client.ShowError(err)
 			break
@@ -309,22 +292,6 @@ func (cs *ChatSession) formatStatusInfo(status *command.StatusInfo) string {
 		map[bool]string{true: "✓ Enabled", false: "✗ Disabled"}[status.PersistenceEnabled],
 		status.LogLevel,
 		map[bool]string{true: "✓ AGENTS.md loaded", false: "✗ Not initialized (run /init)"}[status.RepositoryInitialized])
-}
-
-// readRawInput reads input without showing a prompt (for Ctrl+C waiting state)
-func (cs *ChatSession) readRawInput() (string, error) {
-	// Use the line editor directly but without showing prompt initially
-	lineEditor, err := termflow.NewLineEditor(cs.client.Client)
-	if err != nil {
-		// Fall back to basic input reading
-		return cs.client.Client.ReadLine()
-	}
-
-	// Set history
-	lineEditor.SetHistory(cs.getInputHistory())
-
-	// Read without initial prompt display
-	return lineEditor.ReadLineWithoutPrompt()
 }
 
 // getInputHistory returns the current input history for commands
