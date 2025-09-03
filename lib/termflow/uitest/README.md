@@ -1,54 +1,54 @@
 # Termflow UI Testing Framework
 
-Playwright風の端末アプリケーション自動テストフレームワークです。
+A Playwright-style automated testing framework for terminal applications.
 
-## 概要
+## Overview
 
-このフレームワークは、termflowベースのアプリケーションのUIを自動テストするためのツールです。実際の端末環境を模擬し、ユーザーインタラクションをシミュレートして、出力を検証できます。
+This framework provides tools for automated UI testing of termflow-based applications. It simulates real terminal environments, allowing you to simulate user interactions and validate outputs.
 
-## 機能
+## Features
 
-### 1. **TerminalTest** - 仮想端末テスト
-- 実際のPTY（pseudo-terminal）を使用
-- リアルなキーボード入力シミュレーション
-- ANSI エスケープシーケンス対応
-- スピナーアニメーション検証
+### 1. **TerminalTest** - Virtual Terminal Testing
+- Uses actual PTY (pseudo-terminal)
+- Real keyboard input simulation
+- ANSI escape sequence support
+- Spinner animation validation
 
-### 2. **MockIO** - 軽量単体テスト
-- I/O をモックしてコンポーネント単位でテスト
-- 高速実行
-- 出力フォーマット検証
+### 2. **MockIO** - Lightweight Unit Testing
+- Mock I/O for component-level testing
+- Fast execution
+- Output format validation
 
-## 使い方
+## Usage
 
-### 基本的なテスト
+### Basic Testing
 
 ```go
 func TestMyApp(t *testing.T) {
-    // アプリケーションを起動
+    // Start application
     tt, err := NewTerminalTest(t, "./my-app", "--termflow")
     if err != nil {
         t.Fatalf("Failed to start: %v", err)
     }
     defer tt.Close()
 
-    // 起動を待つ
+    // Wait for startup
     tt.Wait(500 * time.Millisecond)
 
-    // ウェルカムメッセージを確認
+    // Verify welcome message
     tt.ExpectWelcome()
     tt.ExpectPrompt()
 
-    // ユーザー入力をシミュレート
+    // Simulate user input
     tt.Type("hello world")
 
-    // 応答を待って検証
+    // Wait for response and validate
     tt.Wait(1 * time.Second)
     tt.ExpectOutput("Hello!")
 }
 ```
 
-### 高度なテスト
+### Advanced Testing
 
 ```go
 func TestSpinnerAndCtrlC(t *testing.T) {
@@ -60,25 +60,25 @@ func TestSpinnerAndCtrlC(t *testing.T) {
 
     tt.Wait(500 * time.Millisecond)
 
-    // 長い処理をトリガー
+    // Trigger long-running task
     tt.Type("complex task")
 
-    // スピナーアニメーションを確認
+    // Verify spinner animation
     tt.ExpectSpinner()
     tt.ExpectThinking()
 
-    // Ctrl+C のテスト
+    // Test Ctrl+C behavior
     tt.SendCtrlC()
     tt.ExpectOutput("Press Ctrl+C again to exit")
-    tt.ExpectNoCtrlC() // ^C文字が表示されないことを確認
+    tt.ExpectNoCtrlC() // Verify ^C characters are not displayed
 
-    // 2回目のCtrl+C
+    // Second Ctrl+C
     tt.SendCtrlC()
     tt.ExpectOutput("Goodbye!")
 }
 ```
 
-### マルチライン入力テスト
+### Multiline Input Testing
 
 ```go
 func TestMultilineInput(t *testing.T) {
@@ -90,21 +90,21 @@ func TestMultilineInput(t *testing.T) {
 
     tt.Wait(500 * time.Millisecond)
 
-    // マルチライン入力をトリガー
+    // Trigger multiline input
     tt.SendKeys("Write a function...")
     tt.SendEnter()
 
-    // 継続プロンプトを確認
+    // Verify continuation prompt
     tt.ExpectOutput("Continue typing")
-    tt.ExpectPattern(`\d+>`) // "2>" のような行番号プロンプト
+    tt.ExpectPattern(`\d+>`) // Line number prompt like "2>"
 
-    // 追加の行を入力
+    // Enter additional lines
     tt.SendKeys("def hello():")
     tt.SendEnter()
     tt.SendKeys("    print('Hello')")
     tt.SendEnter()
 
-    // 終了マーカー
+    // End marker
     tt.SendKeys(".")
     tt.SendEnter()
 
@@ -112,48 +112,48 @@ func TestMultilineInput(t *testing.T) {
 }
 ```
 
-## 利用可能なメソッド
+## Available Methods
 
-### 入力操作
-- `SendKeys(string)` - キー入力送信
-- `Type(string)` - テキスト入力 + Enter
-- `SendEnter()` - Enter キー
-- `SendCtrlC()` - Ctrl+C
-- `Wait(duration)` - 待機
+### Input Operations
+- `SendKeys(string)` - Send key input
+- `Type(string)` - Type text + Enter
+- `SendEnter()` - Send Enter key
+- `SendCtrlC()` - Send Ctrl+C
+- `Wait(duration)` - Wait for specified duration
 
-### 出力検証
-- `ExpectOutput(string)` - テキストが含まれることを確認
-- `ExpectPattern(regex)` - 正規表現マッチを確認
-- `ExpectPrompt()` - プロンプト（✦）の存在確認
-- `ExpectWelcome()` - ウェルカムメッセージ確認
-- `ExpectSpinner()` - スピナーアニメーション確認
-- `ExpectThinking()` - "Thinking..." メッセージ確認
-- `ExpectNoCtrlC()` - ^C 文字が表示されないことを確認
+### Output Validation
+- `ExpectOutput(string)` - Verify text is present in output
+- `ExpectPattern(regex)` - Verify regex pattern matches
+- `ExpectPrompt()` - Verify prompt (✦) is present
+- `ExpectWelcome()` - Verify welcome message
+- `ExpectSpinner()` - Verify spinner animation
+- `ExpectThinking()` - Verify "Thinking..." message
+- `ExpectNoCtrlC()` - Verify ^C characters are not displayed
 
-### デバッグ
-- `GetOutput()` - 生出力取得（ANSIコード含む）
-- `GetVisibleOutput()` - 表示テキスト取得（ANSIコード除去）
-- `Screenshot()` - 現在の画面状態をフォーマット表示
-- `GetLines()` - 行ごとの出力配列
+### Debugging
+- `GetOutput()` - Get raw output (including ANSI codes)
+- `GetVisibleOutput()` - Get visible text (ANSI codes removed)
+- `Screenshot()` - Format and display current screen state
+- `GetLines()` - Get output as array of lines
 
-## テスト実行
+## Running Tests
 
 ```bash
-# 基本テスト
-go test ./lib/termflow/testing
+# Basic tests
+go test ./lib/termflow/uitest
 
-# 統合テスト（バイナリビルド必要）
+# Integration tests (requires binary build)
 go build -o /tmp/rigel-test cmd/rigel/main.go
-go test ./lib/termflow/testing -v
+go test ./lib/termflow/uitest -v
 
-# ベンチマーク
-go test -bench=. ./lib/termflow/testing
+# Benchmarks
+go test -bench=. ./lib/termflow/uitest
 
-# 短時間テストのみ（統合テストをスキップ）
-go test -short ./lib/termflow/testing
+# Short tests only (skip integration tests)
+go test -short ./lib/termflow/uitest
 ```
 
-## アーキテクチャ
+## Architecture
 
 ```
 ┌─────────────────────────────────────┐
@@ -168,19 +168,19 @@ go test -short ./lib/termflow/testing
 └─────────────────────────────────────┘
 ```
 
-## 制限事項
+## Limitations
 
-- Linux/macOS での PTY サポートが必要
-- Windows では制限あり（WSL推奨）
-- アプリケーションのビルドが必要
-- タイミングに依存するテストは不安定になる可能性
+- Requires PTY support on Linux/macOS
+- Limited Windows support (WSL recommended)
+- Application build required
+- Timing-dependent tests may be unstable
 
-## ベストプラクティス
+## Best Practices
 
-1. **適切な待機時間**: `Wait()` で十分な時間を設ける
-2. **スクリーンショット活用**: デバッグ時は `Screenshot()` を使用
-3. **段階的検証**: 大きな動作を小さなステップに分けて検証
-4. **環境の初期化**: 各テストで新しいTerminalTestインスタンス使用
-5. **エラーハンドリング**: defer で必ずCloseを呼ぶ
+1. **Proper Wait Times**: Use `Wait()` with sufficient duration
+2. **Use Screenshots**: Use `Screenshot()` for debugging
+3. **Step-by-Step Validation**: Break large operations into small verification steps
+4. **Environment Initialization**: Use new TerminalTest instance for each test
+5. **Error Handling**: Always call Close() with defer
 
-このフレームワークにより、termflowアプリケーションの品質を自動テストで保証できます。
+This framework enables automated quality assurance for termflow applications through comprehensive testing.
