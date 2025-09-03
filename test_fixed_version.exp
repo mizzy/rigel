@@ -1,0 +1,61 @@
+#!/usr/bin/expect
+
+# Set timeout
+set timeout 30
+
+# Clear output file
+exec rm -f /tmp/rigel_output.txt
+
+# Start logging
+log_file /tmp/rigel_output.txt
+
+# Start rigel fixed version
+spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama ./rigel-fixed --termflow
+
+# Wait for prompt
+expect "✦"
+sleep 1
+
+puts "\n=== Testing FIXED version with proper column resets ==="
+
+# Test sequence exactly as user reported
+send "aaaaa"
+puts "Sent: aaaaa"
+sleep 0.5
+
+send "\x0A"  
+puts "Sent: Ctrl+J (first)"
+sleep 0.5
+
+send "bbbbb"  
+puts "Sent: bbbbb"
+sleep 0.5
+
+send "\x0A"
+puts "Sent: Ctrl+J (second)"  
+sleep 0.5
+
+send "ccccc"
+puts "Sent: ccccc"
+sleep 0.5
+
+send "\x0A"
+puts "Sent: Ctrl+J (third)"
+sleep 0.5
+
+send "ddddd"
+puts "Sent: ddddd"
+sleep 1
+
+puts "=== Final state capture ==="
+
+# Exit with double Ctrl+C
+send "\x03"
+sleep 0.5
+send "\x03"
+expect eof
+
+puts "=== Test completed - analyzing results ==="
+
+# Analyze the output
+exec python3 ./analyze_indentation.py /tmp/rigel_output.txt

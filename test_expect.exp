@@ -1,0 +1,67 @@
+#!/usr/bin/expect
+
+# Set timeout for expect commands
+set timeout 30
+
+# Clear debug log
+exec rm -f /tmp/rigel_debug.log
+
+# Start the rigel application
+spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama ./rigel-test-env --termflow
+
+# Wait for the initial prompt
+expect "✦"
+sleep 1
+
+# Send the test sequence
+send "aaaa"
+sleep 0.5
+
+# First Ctrl+J
+send "\x0A"
+sleep 0.5
+
+send "bbbb"
+sleep 0.5
+
+# Second Ctrl+J  
+send "\x0A"
+sleep 0.5
+
+send "cccc"
+sleep 0.5
+
+# Third Ctrl+J
+send "\x0A"
+sleep 0.5
+
+send "dddd"
+sleep 1
+
+# Capture the current display state
+send ""
+sleep 1
+
+# Exit with Ctrl+C twice
+send "\x03"
+sleep 0.5
+send "\x03"
+sleep 0.5
+
+# Close the spawn
+expect eof
+
+puts "\n=== EXPECT TEST COMPLETED ==="
+puts "Checking debug log..."
+
+# Check if debug log exists and show contents
+if {[file exists "/tmp/rigel_debug.log"]} {
+    puts "Debug log contents:"
+    exec cat /tmp/rigel_debug.log
+} else {
+    puts "No debug log found"
+}
+
+puts "=== TEST ANALYSIS ==="
+puts "Look at the terminal output above to check for cumulative indentation"
+puts "Each line after the first should have consistent 2-space indentation"

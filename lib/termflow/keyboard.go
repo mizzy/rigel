@@ -29,6 +29,7 @@ const (
 	KeyArrowRight
 	KeyCtrlC
 	KeyCtrlD
+	KeyCtrlJ
 	KeyEscape
 )
 
@@ -57,6 +58,8 @@ func (k Key) String() string {
 		return "Ctrl+C"
 	case KeyCtrlD:
 		return "Ctrl+D"
+	case KeyCtrlJ:
+		return "Ctrl+J"
 	case KeyEscape:
 		return "Escape"
 	default:
@@ -135,7 +138,9 @@ func (kr *KeyboardReader) ReadKey() (Key, error) {
 		return Key{Type: KeyCtrlD}, nil
 	case 9: // Tab
 		return Key{Type: KeyTab}, nil
-	case 13, 10: // Enter (CR or LF)
+	case 10: // Ctrl+J (Line Feed)
+		return Key{Type: KeyCtrlJ}, nil
+	case 13: // Enter (CR)
 		return Key{Type: KeyEnter}, nil
 	case 127, 8: // Backspace (DEL or BS)
 		return Key{Type: KeyBackspace}, nil

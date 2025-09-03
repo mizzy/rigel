@@ -78,6 +78,11 @@ func (tt *TerminalTest) SendCtrlC() error {
 	return tt.SendKeys("\x03")
 }
 
+// SendCtrlJ sends Ctrl+J to the terminal
+func (tt *TerminalTest) SendCtrlJ() error {
+	return tt.SendKeys("\x0A")
+}
+
 // SendEnter sends Enter key to the terminal
 func (tt *TerminalTest) SendEnter() error {
 	return tt.SendKeys("\r\n")
@@ -268,6 +273,19 @@ func (tt *TerminalTest) Screenshot() string {
 	lines := tt.GetLines()
 	var result strings.Builder
 	result.WriteString("=== Terminal Screenshot ===\n")
+	for i, line := range lines {
+		// Show ALL lines including empty ones to get accurate terminal representation
+		result.WriteString(fmt.Sprintf("%2d: %s\n", i+1, line))
+	}
+	result.WriteString("========================\n")
+	return result.String()
+}
+
+// ScreenshotNonEmpty returns a formatted view showing only non-empty lines (original behavior)
+func (tt *TerminalTest) ScreenshotNonEmpty() string {
+	lines := tt.GetLines()
+	var result strings.Builder
+	result.WriteString("=== Terminal Screenshot (Non-Empty) ===\n")
 	for i, line := range lines {
 		if strings.TrimSpace(line) != "" {
 			result.WriteString(fmt.Sprintf("%2d: %s\n", i+1, line))
