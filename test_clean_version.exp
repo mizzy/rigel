@@ -1,0 +1,66 @@
+#!/usr/bin/expect
+
+# Set timeout
+set timeout 30
+
+# Clear debug log and output file
+exec rm -f /tmp/rigel_debug.log
+exec rm -f /tmp/rigel_output.txt
+
+# Start logging
+log_file /tmp/rigel_output.txt
+
+# Start rigel clean version
+spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama ./rigel-clean --termflow
+
+# Wait for prompt
+expect "✦"
+sleep 1
+
+puts "\n=== Testing clean version ==="
+
+# Test sequence with detailed logging
+send "aaaaa"
+puts "Sent: aaaaa"
+sleep 0.5
+
+send "\x0A"
+puts "Sent: Ctrl+J (first)"
+sleep 0.5
+
+send "bbbbb"  
+puts "Sent: bbbbb"
+sleep 0.5
+
+send "\x0A"
+puts "Sent: Ctrl+J (second)"
+sleep 0.5
+
+send "ccccc"
+puts "Sent: ccccc"  
+sleep 0.5
+
+send "\x0A"
+puts "Sent: Ctrl+J (third)"
+sleep 0.5
+
+send "ddddd"
+puts "Sent: ddddd"
+sleep 1
+
+puts "=== Capturing final state ==="
+
+# Exit
+send "\x03"
+sleep 0.5
+send "\x03"
+expect eof
+
+puts "=== Test completed ==="
+
+# Close log
+close
+
+# Analyze the output
+puts "=== ANALYZING INDENTATION ==="
+exec python3 ./analyze_indentation.py /tmp/rigel_output.txt

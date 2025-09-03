@@ -1,0 +1,50 @@
+#!/usr/bin/expect
+
+# Set timeout
+set timeout 30
+
+# Start rigel with welcome fix
+spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama ./rigel-welcome-fix --termflow
+
+# Wait for welcome message and prompt
+expect "✦ Rigel - AI Coding Agent"
+expect "✦"
+sleep 1
+
+puts "\n=== Testing welcome message preservation fix ==="
+puts "Performing exact user sequence: aaaa + Ctrl+J + bbbb + Ctrl+J + cccc + Ctrl+J"
+
+# Exact user sequence
+send "aaaa"
+puts "Sent: aaaa"
+sleep 0.5
+
+send "\x0A"  
+puts "Sent: Ctrl+J (first)"
+sleep 0.5
+
+send "bbbb"  
+puts "Sent: bbbb"
+sleep 0.5
+
+send "\x0A"
+puts "Sent: Ctrl+J (second)"  
+sleep 0.5
+
+send "cccc"
+puts "Sent: cccc"
+sleep 0.5
+
+send "\x0A"
+puts "Sent: Ctrl+J (third)"
+sleep 1
+
+puts "=== Capturing final state - should preserve welcome message ==="
+
+# Exit
+send "\x03"
+sleep 0.5
+send "\x03"
+expect eof
+
+puts "=== Test completed ==="

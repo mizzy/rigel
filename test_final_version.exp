@@ -1,0 +1,61 @@
+#!/usr/bin/expect
+
+# Set timeout
+set timeout 30
+
+# Clear output file
+exec rm -f /tmp/rigel_output.txt
+
+# Start logging
+log_file /tmp/rigel_output.txt
+
+# Start rigel final version  
+spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama ./rigel-final --termflow
+
+# Wait for prompt
+expect "✦"
+sleep 1
+
+puts "\n=== Testing FINAL version - both indentation and duplication fixes ==="
+
+# Test sequence exactly as user reported
+send "aaaaa"
+puts "Sent: aaaaa"
+sleep 0.5
+
+send "\x0A"  
+puts "Sent: Ctrl+J (first)"
+sleep 0.5
+
+send "bbbb"  
+puts "Sent: bbbb"
+sleep 0.5
+
+send "\x0A"
+puts "Sent: Ctrl+J (second)"  
+sleep 0.5
+
+send "ccccc"
+puts "Sent: ccccc"
+sleep 0.5
+
+send "\x0A"
+puts "Sent: Ctrl+J (third)"
+sleep 0.5
+
+send "dddd"
+puts "Sent: dddd"
+sleep 1
+
+puts "=== Capturing final display - should show no duplication and proper alignment ==="
+
+# Exit with double Ctrl+C
+send "\x03"
+sleep 0.5
+send "\x03"
+expect eof
+
+puts "=== Test completed - analyzing final results ==="
+
+# Analyze the output
+exec python3 ./analyze_indentation.py /tmp/rigel_output.txt
