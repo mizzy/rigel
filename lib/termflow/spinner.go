@@ -154,18 +154,6 @@ func (ts *ThinkingSpinner) Stop() {
 	ts.clearThinking()
 }
 
-// showThinking displays the thinking message with spinner
-func (ts *ThinkingSpinner) showThinking() {
-	frame := ts.spinner.Frame()
-	if frame != "" {
-		// Colored spinner frame (cyan like bubbletea)
-		coloredFrame := fmt.Sprintf("\033[1;38;5;87m%s\033[0m", frame)
-		// Italic thinking text (like bubbletea)
-		coloredMessage := fmt.Sprintf("\033[3;38;5;117m %s\033[0m", ts.message)
-		ts.client.Printf("\n%s%s", coloredFrame, coloredMessage)
-	}
-}
-
 // clearThinking clears the current thinking line
 func (ts *ThinkingSpinner) clearThinking() {
 	// Move cursor up one line, clear it completely
@@ -190,19 +178,17 @@ func (ts *ThinkingSpinner) updateDisplay() {
 	defer ticker.Stop()
 
 	for ts.spinner.IsRunning() {
-		select {
-		case <-ticker.C:
-			if ts.spinner.IsRunning() {
-				// Move cursor up one line, clear it, and redraw with new frame
-				ts.client.Printf("\033[1A\033[2K\r")
-				frame := ts.spinner.Frame()
-				if frame != "" {
-					// Colored spinner frame (cyan like bubbletea)
-					coloredFrame := fmt.Sprintf("\033[1;38;5;87m%s\033[0m", frame)
-					// Italic thinking text (like bubbletea)
-					coloredMessage := fmt.Sprintf("\033[3;38;5;117m %s\033[0m", ts.message)
-					ts.client.Printf("\n%s%s", coloredFrame, coloredMessage)
-				}
+		<-ticker.C
+		if ts.spinner.IsRunning() {
+			// Move cursor up one line, clear it, and redraw with new frame
+			ts.client.Printf("\033[1A\033[2K\r")
+			frame := ts.spinner.Frame()
+			if frame != "" {
+				// Colored spinner frame (cyan like bubbletea)
+				coloredFrame := fmt.Sprintf("\033[1;38;5;87m%s\033[0m", frame)
+				// Italic thinking text (like bubbletea)
+				coloredMessage := fmt.Sprintf("\033[3;38;5;117m %s\033[0m", ts.message)
+				ts.client.Printf("\n%s%s", coloredFrame, coloredMessage)
 			}
 		}
 	}

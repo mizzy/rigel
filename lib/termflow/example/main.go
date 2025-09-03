@@ -49,6 +49,7 @@ func main() {
 	client.Printf("Example: 'Write a function...' then continue on next lines\n\n")
 
 	// Main loop
+mainLoop:
 	for {
 		input, err := client.ReadLineOrMultiLine()
 		if err != nil {
@@ -63,7 +64,7 @@ func main() {
 		switch {
 		case input == "/quit" || input == "/exit":
 			client.ShowInfo("Goodbye!")
-			break
+			break mainLoop
 
 		case input == "/help":
 			client.Printf("\nAvailable commands:\n")
