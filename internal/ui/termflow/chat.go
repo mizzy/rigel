@@ -70,6 +70,12 @@ func NewChatSession(provider llm.Provider, cfg *config.Config) (*ChatSession, er
 	// Set up command completion
 	session.setupCompletion()
 
+	// Load persistent history into the client
+	if histManager != nil {
+		history := histManager.GetCommands()
+		client.SetHistory(history)
+	}
+
 	return session, nil
 }
 

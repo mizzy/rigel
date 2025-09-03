@@ -171,6 +171,11 @@ func (ic *InteractiveClient) Close() error {
 	return nil
 }
 
+// SetHistory sets the command history for the interactive client
+func (ic *InteractiveClient) SetHistory(history []string) {
+	ic.history = append([]string{}, history...) // Copy the history
+}
+
 // ShowCompletions displays available completions
 func (ic *InteractiveClient) ShowCompletions(input string, completions []string) {
 	if len(completions) == 0 {

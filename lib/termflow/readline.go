@@ -56,7 +56,7 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 	le.historyIndex = -1
 
 	// Show initial prompt
-	fmt.Fprint(le.client.output, le.prompt)
+	le.refreshDisplay()
 
 	for {
 		key, err := le.keyboard.ReadKey()
