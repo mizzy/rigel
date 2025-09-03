@@ -22,6 +22,7 @@ type LineEditor struct {
 	exitMessageShown bool        // Track if exit message is shown below current line
 	cursorOnExitLine bool        // Track if cursor is positioned on the line above exit message
 	ctrlCTimer       *time.Timer // Timer to reset Ctrl+C state after 1 second
+	displayedLines   int         // Track how many lines we've displayed
 }
 
 // NewLineEditor creates a new line editor
@@ -32,13 +33,14 @@ func NewLineEditor(client *Client) (*LineEditor, error) {
 	}
 
 	return &LineEditor{
-		client:       client,
-		keyboard:     keyboard,
-		history:      []string{},
-		historyIndex: -1,
-		line:         "",
-		cursor:       0,
-		prompt:       client.prompt,
+		client:         client,
+		keyboard:       keyboard,
+		history:        []string{},
+		historyIndex:   -1,
+		line:           "",
+		cursor:         0,
+		prompt:         client.prompt,
+		displayedLines: 0,
 	}, nil
 }
 
@@ -61,6 +63,7 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 	le.line = ""
 	le.cursor = 0
 	le.historyIndex = -1
+	le.displayedLines = 0
 
 	// Show initial prompt
 	le.refreshDisplay()
@@ -81,6 +84,7 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 			le.ctrlCPressed = false
 			le.exitMessageShown = false
 			le.cursorOnExitLine = false
+			le.displayedLines = 0
 
 			// Stop timer if running
 			le.stopCtrlCTimer()
@@ -147,17 +151,32 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 			// TODO: Implement tab completion
 			continue
 
+		case KeyCtrlJ:
+			// Insert newline for multiline input
+			le.insertRune('\n')
+			le.refreshDisplay()
+			continue
+
 		case KeyRune:
 			le.insertRune(key.Rune)
-			// Don't reset cursorOnExitLine immediately, let refreshDisplay handle it
+
+			// Use smart refresh: simple echo for single-line, no refresh for multiline character input
+			if strings.Contains(le.line, "\n") {
+				// We're in multiline mode - just echo the character, don't do full refresh
+				// This prevents the duplication issue
+				fmt.Fprint(le.client.output, string(key.Rune))
+			} else {
+				// Single line mode - use simple character echo
+				fmt.Fprint(le.client.output, string(key.Rune))
+			}
 
 		default:
 			// Ignore unknown keys
 			continue
 		}
 
-		// Refresh the display
-		le.refreshDisplay()
+		// For non-KeyRune cases that need refresh, it's handled in the specific case
+		// No automatic refresh here to avoid duplication
 	}
 }
 
@@ -229,31 +248,115 @@ func (le *LineEditor) navigateHistory(direction int) {
 	}
 }
 
-// refreshDisplay redraws the current line
+// refreshDisplay redraws the current line(s) with multiline support
 func (le *LineEditor) refreshDisplay() {
-	// Normal display logic - cursor is already positioned correctly after Ctrl+C
-	fmt.Fprint(le.client.output, "\r\033[K")
-	fmt.Fprint(le.client.output, le.prompt)
-	fmt.Fprint(le.client.output, le.line)
-	// Position cursor correctly
-	if le.cursor < len(le.line) {
-		fmt.Fprintf(le.client.output, "\033[%dD", len(le.line)-le.cursor)
+	lines := strings.Split(le.line, "\n")
+
+	// Compute cursor location in input text for final positioning
+	textBeforeCursor := le.line[:le.cursor]
+	linesBeforeCursor := strings.Split(textBeforeCursor, "\n")
+	currentLineIndex := len(linesBeforeCursor) - 1
+	currentColumn := len(linesBeforeCursor[len(linesBeforeCursor)-1])
+
+	// Move to the top of the previously drawn input block and clear it
+	n := le.displayedLines
+	if n > 0 {
+		if n > 1 {
+			fmt.Fprintf(le.client.output, "\033[%dA", n-1)
+		}
+		fmt.Fprint(le.client.output, "\r")
+		for i := 0; i < n; i++ {
+			fmt.Fprint(le.client.output, "\033[K")
+			if i < n-1 {
+				fmt.Fprint(le.client.output, "\033[1B\r")
+			}
+		}
+		if n > 1 {
+			fmt.Fprintf(le.client.output, "\033[%dA\r", n-1)
+		} else {
+			fmt.Fprint(le.client.output, "\r")
+		}
 	}
+
+	// Draw fresh content (no leading newline; spacer is provided by welcome)
+	fmt.Fprint(le.client.output, le.prompt)
+	fmt.Fprint(le.client.output, lines[0])
+	for i := 1; i < len(lines); i++ {
+		fmt.Fprint(le.client.output, "\n\r  ")
+		fmt.Fprint(le.client.output, lines[i])
+	}
+
+	// Position cursor
+	if len(lines) > 1 {
+		fmt.Fprintf(le.client.output, "\033[%dA", len(lines)-1)
+	}
+	fmt.Fprint(le.client.output, "\r")
+	if currentLineIndex > 0 {
+		fmt.Fprintf(le.client.output, "\033[%dB", currentLineIndex)
+		fmt.Fprintf(le.client.output, "\033[%dC", 2+currentColumn)
+	} else {
+		fmt.Fprintf(le.client.output, "\033[%dC", visibleLength(le.prompt)+currentColumn)
+	}
+
+	le.displayedLines = len(lines)
 }
 
-// refreshDisplayWithoutPrompt redraws the current line without showing the prompt
+// refreshDisplayWithoutPrompt redraws the current line(s) without showing the prompt
 func (le *LineEditor) refreshDisplayWithoutPrompt() {
-	// Clear the current line
-	fmt.Fprint(le.client.output, "\r\033[K")
+	lines := strings.Split(le.line, "\n")
 
-	// Print only the current line (no prompt)
-	fmt.Fprint(le.client.output, le.line)
+	// Calculate cursor position
+	textBeforeCursor := le.line[:le.cursor]
+	linesBeforeCursor := strings.Split(textBeforeCursor, "\n")
+	targetLine := len(linesBeforeCursor) - 1
+	targetColumn := len(linesBeforeCursor[len(linesBeforeCursor)-1])
+
+	// Move to end of first line (after the prompt and first line content)
+	fmt.Fprint(le.client.output, "\r")
+	fmt.Fprint(le.client.output, "\033[999C") // Move to end of line
+
+	// Clear all continuation lines aggressively
+	maxLinesToClear := 10 // Clear up to 10 lines to be safe
+	for i := 0; i < maxLinesToClear; i++ {
+		fmt.Fprint(le.client.output, "\n\r\033[K") // Move down, carriage return, then clear line
+	}
+
+	// Move back to end of first line
+	fmt.Fprintf(le.client.output, "\033[%dA", maxLinesToClear) // Move back up
+	fmt.Fprint(le.client.output, "\r\033[999C")                // Move to end of first line
+
+	// Display only continuation lines (skip first line which already has prompt)
+	for i := 1; i < len(lines); i++ {
+		fmt.Fprint(le.client.output, "\n\r  ") // Newline + carriage return + 2 spaces for alignment
+		fmt.Fprint(le.client.output, lines[i])
+	}
 
 	// Position cursor correctly
-	if le.cursor < len(le.line) {
-		// Move cursor to correct position
-		fmt.Fprintf(le.client.output, "\033[%dD", len(le.line)-le.cursor)
+	// Move to beginning of first line
+	if len(lines) > 1 {
+		fmt.Fprintf(le.client.output, "\033[%dA", len(lines)-1)
 	}
+	fmt.Fprint(le.client.output, "\r")
+
+	// Move down to target line
+	if targetLine > 0 {
+		fmt.Fprintf(le.client.output, "\033[%dB", targetLine)
+	}
+
+	// Move to target column, accounting for alignment on continuation lines
+	if targetLine == 0 {
+		// First line - no additional alignment
+		fmt.Fprintf(le.client.output, "\033[%dC", targetColumn)
+	} else {
+		// Subsequent lines have 2-space alignment + target column
+		totalColumn := 2 + targetColumn
+		if totalColumn > 0 {
+			fmt.Fprintf(le.client.output, "\033[%dC", totalColumn)
+		}
+	}
+
+	// Update displayed lines count for next refresh
+	le.displayedLines = len(lines)
 }
 
 // ReadLineWithoutPrompt reads input without showing the initial prompt
@@ -269,6 +372,7 @@ func (le *LineEditor) ReadLineWithoutPrompt() (string, error) {
 	le.line = ""
 	le.cursor = 0
 	le.historyIndex = -1
+	le.displayedLines = 0
 
 	// Don't show initial prompt - this is the key difference
 
@@ -288,6 +392,7 @@ func (le *LineEditor) ReadLineWithoutPrompt() (string, error) {
 			le.ctrlCPressed = false
 			le.exitMessageShown = false
 			le.cursorOnExitLine = false
+			le.displayedLines = 0
 
 			// Stop timer if running
 			le.stopCtrlCTimer()
@@ -380,6 +485,11 @@ func (le *LineEditor) ReadLineWithoutPrompt() (string, error) {
 				le.refreshDisplayWithoutPrompt()
 			}
 
+		case KeyCtrlJ:
+			// Insert newline for multiline input
+			le.insertRune('\n')
+			le.refreshDisplayWithoutPrompt()
+
 		case KeyRune:
 			// Insert character at cursor position
 			if le.cursor >= len(le.line) {
@@ -445,5 +555,43 @@ func (le *LineEditor) stopCtrlCTimer() {
 	if le.ctrlCTimer != nil {
 		le.ctrlCTimer.Stop()
 		le.ctrlCTimer = nil
+	}
+}
+
+// positionCursor positions the cursor at the correct location in multiline input
+func (le *LineEditor) positionCursor() {
+	if le.cursor >= len(le.line) {
+		// Cursor is at the end, nothing to do
+		return
+	}
+
+	// Calculate cursor position in multiline input
+	textBeforeCursor := le.line[:le.cursor]
+	lines := strings.Split(le.line, "\n")
+	linesBeforeCursor := strings.Split(textBeforeCursor, "\n")
+
+	// Calculate which line the cursor is on
+	currentLine := len(linesBeforeCursor) - 1
+	// Calculate column position in the current line
+	columnPosition := len(linesBeforeCursor[len(linesBeforeCursor)-1])
+
+	// Move cursor to correct line (go up from bottom)
+	totalLines := len(lines)
+	linesToMoveUp := totalLines - 1 - currentLine
+
+	if linesToMoveUp > 0 {
+		fmt.Fprintf(le.client.output, "\033[%dA", linesToMoveUp)
+	}
+
+	// Position cursor at correct column
+	// First move to beginning of line, then move right to column position
+	fmt.Fprint(le.client.output, "\r")
+
+	// If this is the first line, account for prompt length
+	if currentLine == 0 {
+		totalColumnPosition := visibleLength(le.prompt) + columnPosition
+		fmt.Fprintf(le.client.output, "\033[%dC", totalColumnPosition)
+	} else {
+		fmt.Fprintf(le.client.output, "\033[%dC", columnPosition)
 	}
 }
