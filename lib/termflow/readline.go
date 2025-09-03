@@ -2,6 +2,7 @@ package termflow
 
 import (
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -204,6 +205,129 @@ func (le *LineEditor) refreshDisplay() {
 	if le.cursor < len(le.line) {
 		// Move cursor to correct position
 		fmt.Fprintf(le.client.output, "\033[%dD", len(le.line)-le.cursor)
+	}
+}
+
+// refreshDisplayWithoutPrompt redraws the current line without showing the prompt
+func (le *LineEditor) refreshDisplayWithoutPrompt() {
+	// Clear the current line
+	fmt.Fprint(le.client.output, "\r\033[K")
+
+	// Print only the current line (no prompt)
+	fmt.Fprint(le.client.output, le.line)
+
+	// Position cursor correctly
+	if le.cursor < len(le.line) {
+		// Move cursor to correct position
+		fmt.Fprintf(le.client.output, "\033[%dD", len(le.line)-le.cursor)
+	}
+}
+
+// ReadLineWithoutPrompt reads input without showing the initial prompt
+func (le *LineEditor) ReadLineWithoutPrompt() (string, error) {
+	// Enable raw mode for key-by-key input
+	if err := le.keyboard.EnableRawMode(); err != nil {
+		// Fall back to regular ReadLine if raw mode fails
+		return le.client.ReadLine()
+	}
+	defer le.keyboard.DisableRawMode()
+
+	// Initialize line state
+	le.line = ""
+	le.cursor = 0
+	le.historyIndex = -1
+
+	// Don't show initial prompt - this is the key difference
+
+	for {
+		key, err := le.keyboard.ReadKey()
+		if err != nil {
+			return "", err
+		}
+
+		switch key.Type {
+		case KeyEnter:
+			// Finish input
+			fmt.Fprint(le.client.output, "\n")
+			result := le.line
+
+			// Add to history if not empty and different from last entry
+			if strings.TrimSpace(result) != "" {
+				le.addToHistory(result)
+			}
+
+			return result, nil
+
+		case KeyCtrlC:
+			// Clear current line and move to next line cleanly
+			fmt.Fprint(le.client.output, "\r\033[K\n")
+			return "", fmt.Errorf("interrupted")
+
+		case KeyCtrlD:
+			if le.line == "" {
+				// EOF on empty line
+				fmt.Fprint(le.client.output, "\n")
+				return "", io.EOF
+			}
+			// Otherwise ignore Ctrl+D when there's text
+
+		case KeyBackspace:
+			if le.cursor > 0 {
+				// Remove character before cursor
+				le.line = le.line[:le.cursor-1] + le.line[le.cursor:]
+				le.cursor--
+				le.refreshDisplayWithoutPrompt()
+			}
+
+		case KeyDelete:
+			if le.cursor < len(le.line) {
+				// Remove character at cursor
+				le.line = le.line[:le.cursor] + le.line[le.cursor+1:]
+				le.refreshDisplayWithoutPrompt()
+			}
+
+		case KeyArrowLeft:
+			if le.cursor > 0 {
+				le.cursor--
+				fmt.Fprint(le.client.output, "\033[1D") // Move cursor left
+			}
+
+		case KeyArrowRight:
+			if le.cursor < len(le.line) {
+				le.cursor++
+				fmt.Fprint(le.client.output, "\033[1C") // Move cursor right
+			}
+
+		case KeyArrowUp:
+			if le.historyIndex < len(le.history)-1 {
+				le.historyIndex++
+				le.line = le.history[len(le.history)-1-le.historyIndex]
+				le.cursor = len(le.line)
+				le.refreshDisplayWithoutPrompt()
+			}
+
+		case KeyArrowDown:
+			if le.historyIndex >= 0 {
+				le.historyIndex--
+				if le.historyIndex >= 0 {
+					le.line = le.history[len(le.history)-1-le.historyIndex]
+				} else {
+					le.line = ""
+				}
+				le.cursor = len(le.line)
+				le.refreshDisplayWithoutPrompt()
+			}
+
+		case KeyRune:
+			// Insert character at cursor position
+			if le.cursor >= len(le.line) {
+				le.line += string(key.Rune)
+			} else {
+				le.line = le.line[:le.cursor] + string(key.Rune) + le.line[le.cursor:]
+			}
+			le.cursor++
+			le.refreshDisplayWithoutPrompt()
+		}
 	}
 }
 

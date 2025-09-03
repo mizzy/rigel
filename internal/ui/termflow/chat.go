@@ -101,8 +101,19 @@ func (cs *ChatSession) Run() error {
 
 	// Main chat loop
 	for {
-		// Use ReadLineOrMultiLine to support both single and multi-line input
-		input, err := cs.client.ReadLineOrMultiLine()
+		var input string
+		var err error
+
+		// If waiting for exit, use a different input method that doesn't show prompt
+		if cs.waitingForExit {
+			// Reset the waiting flag and use raw keyboard input
+			cs.waitingForExit = false
+			input, err = cs.readRawInput()
+		} else {
+			// Use ReadLineOrMultiLine to support both single and multi-line input
+			input, err = cs.client.ReadLineOrMultiLine()
+		}
+
 		if err != nil {
 			// Handle interruption with 2-press exit behavior
 			if err.Error() == "interrupted" {
@@ -292,6 +303,22 @@ func (cs *ChatSession) formatStatusInfo(status *command.StatusInfo) string {
 		map[bool]string{true: "✓ Enabled", false: "✗ Disabled"}[status.PersistenceEnabled],
 		status.LogLevel,
 		map[bool]string{true: "✓ AGENTS.md loaded", false: "✗ Not initialized (run /init)"}[status.RepositoryInitialized])
+}
+
+// readRawInput reads input without showing a prompt (for Ctrl+C waiting state)
+func (cs *ChatSession) readRawInput() (string, error) {
+	// Use the line editor directly but without showing prompt initially
+	lineEditor, err := termflow.NewLineEditor(cs.client.Client)
+	if err != nil {
+		// Fall back to basic input reading
+		return cs.client.Client.ReadLine()
+	}
+
+	// Set history
+	lineEditor.SetHistory(cs.getInputHistory())
+
+	// Read without initial prompt display
+	return lineEditor.ReadLineWithoutPrompt()
 }
 
 // getInputHistory returns the current input history for commands
