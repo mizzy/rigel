@@ -41,6 +41,12 @@ dist/
 build/
 bin/
 
+# Local Go build caches
+.gocache/
+.gomodcache/
+lib/.gocache/
+lib/.gomodcache/
+
 # Debug files
 debug
 __debug_bin
