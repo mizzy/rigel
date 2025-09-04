@@ -1,0 +1,39 @@
+#!/usr/bin/expect -f
+set script_dir [file dirname [info script]]
+set root [file normalize [file join $script_dir .. ..]]
+set timeout 5
+
+# Start rigel in termflow mode
+spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama [file join $root bin rigel] --termflow
+
+# Wait a moment for welcome to render
+expect {
+    -re {Rigel - AI Coding Agent} {}
+    timeout { exit 1 }
+}
+# Wait for prompt symbol (with ANSI sequences possibly)
+expect {
+    -re {\x1b\[[0-9;]*m.*✦.*\x1b\[[0-9;]*m } {}
+    timeout { exit 2 }
+}
+# Type 'abc'
+send -- "abc"
+# Send Backspace (DEL)
+send -- "\x7f"
+# Give it a short moment to refresh
+after 200
+
+# Expect that the input line shows 'ab' after the prompt (allowing ANSI sequences)
+expect {
+    -re {\r(?:\x1b\[[0-9;]*[a-zA-Z])*.*✦(?:\x1b\[[0-9;]*[a-zA-Z])*\s*ab(?:\x1b\[[0-9;]*[a-zA-Z])*$} {}
+    timeout { exit 3 }
+}
+
+# Exit cleanly with double Ctrl+C
+send -- "\003"
+after 100
+send -- "\003"
+
+# If we got here, it's OK
+puts "OK"
+expect eof

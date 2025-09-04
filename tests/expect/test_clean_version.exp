@@ -1,5 +1,9 @@
 #!/usr/bin/expect
 
+# Determine repo root from this script location (tests/expect -> repo root)
+set script_dir [file dirname [info script]]
+set root [file normalize [file join $script_dir .. ..]]
+
 # Set timeout
 set timeout 30
 
@@ -11,7 +15,7 @@ exec rm -f /tmp/rigel_output.txt
 log_file /tmp/rigel_output.txt
 
 # Start rigel clean version
-spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama ./rigel-clean --termflow
+spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama [file join $root rigel-clean] --termflow
 
 # Wait for prompt
 expect "✦"
@@ -28,7 +32,7 @@ send "\x0A"
 puts "Sent: Ctrl+J (first)"
 sleep 0.5
 
-send "bbbbb"  
+send "bbbbb"
 puts "Sent: bbbbb"
 sleep 0.5
 
@@ -37,7 +41,7 @@ puts "Sent: Ctrl+J (second)"
 sleep 0.5
 
 send "ccccc"
-puts "Sent: ccccc"  
+puts "Sent: ccccc"
 sleep 0.5
 
 send "\x0A"
@@ -63,4 +67,4 @@ close
 
 # Analyze the output
 puts "=== ANALYZING INDENTATION ==="
-exec python3 ./analyze_indentation.py /tmp/rigel_output.txt
+exec python3 [file join $root analyze_indentation.py] /tmp/rigel_output.txt

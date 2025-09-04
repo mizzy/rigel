@@ -1,10 +1,14 @@
 #!/usr/bin/expect
 
+# Determine repo root from this script location (tests/expect -> repo root)
+set script_dir [file dirname [info script]]
+set root [file normalize [file join $script_dir .. ..]]
+
 # Set timeout
 set timeout 30
 
-# Start rigel with complete fix
-spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama ./rigel-complete-fix --termflow
+# Start rigel with spacer fix
+spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama [file join $root rigel-spacer-fix] --termflow
 
 # Wait for welcome message and prompt
 expect "✦ Rigel - AI Coding Agent"
@@ -12,11 +16,10 @@ expect "Commands: Type / for commands (Ctrl+C to exit)"
 expect "✦"
 sleep 1
 
-puts "\n=== Testing complete blank line preservation fix ==="
-puts "The welcome message should end with exactly 1 blank line before the prompt"
+puts "\n=== Testing blank line preservation fix ==="
 puts "Performing exact user sequence: aaaa + Ctrl+J + bbbb + Ctrl+J + cccc + Ctrl+J"
 
-# Exact user sequence to test blank line preservation
+# Exact user sequence to test spacer preservation
 send "aaaa"
 puts "Sent: aaaa"
 sleep 0.5
@@ -45,7 +48,7 @@ send "dddd"
 puts "Sent: dddd"
 sleep 1
 
-puts "=== Should show exactly 1 blank line preserved before ✦ aaaaa ==="
+puts "=== Should show blank line before ✦ aaaaa ==="
 
 # Exit
 send "\x03"
@@ -53,4 +56,4 @@ sleep 0.5
 send "\x03"
 expect eof
 
-puts "=== Complete fix test completed - exactly 1 blank line should be preserved ==="
+puts "=== Test completed - check for preserved blank line ==="

@@ -1,0 +1,32 @@
+#!/usr/bin/expect -d -f
+set script_dir [file dirname [info script]]
+set root [file normalize [file join $script_dir .. ..]]
+set timeout 10
+log_user 1
+
+spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama [file join $root bin rigel] --termflow
+
+expect {
+    -re {Rigel - AI Coding Agent} {puts "Seen welcome"}
+    timeout { puts "Timeout waiting welcome"; exit 11 }
+}
+
+expect {
+    -re {\x1b\[[0-9;]*m.*✦.*\x1b\[[0-9;]*m } {puts "Seen prompt"}
+    timeout { puts "Timeout waiting prompt"; exit 12 }
+}
+
+send -- "abc"
+send -- "\x7f"
+after 300
+
+expect {
+    -re {\r(?:\x1b\[[0-9;]*[a-zA-Z])*.*✦(?:\x1b\[[0-9;]*[a-zA-Z])*\s*ab(?:\x1b\[[0-9;]*[a-zA-Z])*$} {puts "Backspace reflected"}
+    timeout { puts "Timeout waiting ab"; exit 13 }
+}
+
+send -- "\003"
+after 100
+send -- "\003"
+puts "OK"
+expect eof
