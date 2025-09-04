@@ -102,21 +102,25 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 				le.stopCtrlCTimer()
 				return "", fmt.Errorf("interrupted")
 			}
-			// First Ctrl+C - show exit message below, then move cursor back up
+			// First Ctrl+C: don't redraw the input block to avoid duplication.
+			// Simply print the exit hint on the next line and restore the cursor.
 			le.ctrlCPressed = true
 			le.exitMessageShown = true
 			le.cursorOnExitLine = true
-			// Clear any existing input display
-			fmt.Fprint(le.client.output, "\r\033[K")
-			// Redraw prompt and current line
-			fmt.Fprint(le.client.output, le.prompt)
-			fmt.Fprint(le.client.output, le.line)
-			// Show exit message on the next line, always starting from the beginning
+			// Show exit message on the next line
 			fmt.Fprintf(le.client.output, "\n\r\033[38;5;240m(Press Ctrl+C again to exit)\033[0m")
-			// Move cursor back up to the prompt line, at the correct position
+			// Move cursor back up to the input line
 			fmt.Fprintf(le.client.output, "\033[1A")
-			// Position cursor after prompt + current cursor position
-			fmt.Fprintf(le.client.output, "\r\033[%dC", visibleLength(le.prompt)+le.cursor)
+			// Position cursor depending on whether we're on first or continuation line
+			textBeforeCursor := le.line[:le.cursor]
+			linesBeforeCursor := strings.Split(textBeforeCursor, "\n")
+			currentLineIndex := len(linesBeforeCursor) - 1
+			currentColumn := len(linesBeforeCursor[len(linesBeforeCursor)-1])
+			if currentLineIndex == 0 {
+				fmt.Fprintf(le.client.output, "\r\033[%dC", visibleLength(le.prompt)+currentColumn)
+			} else {
+				fmt.Fprintf(le.client.output, "\r\033[%dC", 2+currentColumn)
+			}
 
 			// Start 1-second timer to reset Ctrl+C state and clear message
 			le.startCtrlCTimer()
@@ -410,21 +414,24 @@ func (le *LineEditor) ReadLineWithoutPrompt() (string, error) {
 				le.stopCtrlCTimer()
 				return "", fmt.Errorf("interrupted")
 			}
-			// First Ctrl+C - show exit message below, then move cursor back up
+			// First Ctrl+C: avoid redrawing the input to prevent duplicate lines.
 			le.ctrlCPressed = true
 			le.exitMessageShown = true
 			le.cursorOnExitLine = true
-			// Clear any existing input display
-			fmt.Fprint(le.client.output, "\r\033[K")
-			// Redraw prompt and current line
-			fmt.Fprint(le.client.output, le.prompt)
-			fmt.Fprint(le.client.output, le.line)
-			// Show exit message on the next line, always starting from the beginning
+			// Show exit message on the next line
 			fmt.Fprintf(le.client.output, "\n\r\033[38;5;240m(Press Ctrl+C again to exit)\033[0m")
-			// Move cursor back up to the prompt line, at the correct position
+			// Move cursor back up to the input line
 			fmt.Fprintf(le.client.output, "\033[1A")
-			// Position cursor after prompt + current cursor position
-			fmt.Fprintf(le.client.output, "\r\033[%dC", visibleLength(le.prompt)+le.cursor)
+			// Position cursor depending on whether we're on first or continuation line
+			textBeforeCursor := le.line[:le.cursor]
+			linesBeforeCursor := strings.Split(textBeforeCursor, "\n")
+			currentLineIndex := len(linesBeforeCursor) - 1
+			currentColumn := len(linesBeforeCursor[len(linesBeforeCursor)-1])
+			if currentLineIndex == 0 {
+				fmt.Fprintf(le.client.output, "\r\033[%dC", visibleLength(le.prompt)+currentColumn)
+			} else {
+				fmt.Fprintf(le.client.output, "\r\033[%dC", 2+currentColumn)
+			}
 
 			// Start 1-second timer to reset Ctrl+C state and clear message
 			le.startCtrlCTimer()
@@ -544,9 +551,17 @@ func (le *LineEditor) startCtrlCTimer() {
 		fmt.Fprint(le.client.output, "\033[1B")  // Move down 1 line to the exit message
 		fmt.Fprint(le.client.output, "\r\033[K") // Clear the line
 
-		// Move back up to the original prompt line and reposition cursor
+		// Move back up to the input line and reposition cursor accurately
 		fmt.Fprint(le.client.output, "\033[1A") // Move up 1 line
-		fmt.Fprintf(le.client.output, "\r\033[%dC", visibleLength(le.prompt)+le.cursor)
+		textBeforeCursor := le.line[:le.cursor]
+		linesBeforeCursor := strings.Split(textBeforeCursor, "\n")
+		currentLineIndex := len(linesBeforeCursor) - 1
+		currentColumn := len(linesBeforeCursor[len(linesBeforeCursor)-1])
+		if currentLineIndex == 0 {
+			fmt.Fprintf(le.client.output, "\r\033[%dC", visibleLength(le.prompt)+currentColumn)
+		} else {
+			fmt.Fprintf(le.client.output, "\r\033[%dC", 2+currentColumn)
+		}
 	})
 }
 
