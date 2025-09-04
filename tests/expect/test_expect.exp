@@ -1,5 +1,9 @@
 #!/usr/bin/expect
 
+# Determine repo root from this script location (tests/expect -> repo root)
+set script_dir [file dirname [info script]]
+set root [file normalize [file join $script_dir .. ..]]
+
 # Set timeout for expect commands
 set timeout 30
 
@@ -7,7 +11,7 @@ set timeout 30
 exec rm -f /tmp/rigel_debug.log
 
 # Start the rigel application
-spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama ./rigel-test-env --termflow
+spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama [file join $root rigel-test-env] --termflow
 
 # Wait for the initial prompt
 expect "✦"

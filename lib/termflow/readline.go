@@ -134,22 +134,42 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 			// If there's content, Ctrl+D does nothing
 
 		case KeyBackspace:
-			le.handleBackspace()
+			// Update buffer then refresh display so character disappears visually
+			if le.cursor > 0 {
+				le.handleBackspace()
+				le.refreshDisplay()
+			}
 
 		case KeyDelete:
-			le.handleDelete()
+			// Update buffer then refresh display to reflect deletion
+			if le.cursor < len(le.line) {
+				le.handleDelete()
+				le.refreshDisplay()
+			}
 
 		case KeyArrowLeft:
-			le.moveCursorLeft()
+			// Move cursor and refresh to reposition visibly (supports multiline)
+			if le.cursor > 0 {
+				le.moveCursorLeft()
+				le.refreshDisplay()
+			}
 
 		case KeyArrowRight:
-			le.moveCursorRight()
+			// Move cursor and refresh to reposition visibly (supports multiline)
+			if le.cursor < len(le.line) {
+				le.moveCursorRight()
+				le.refreshDisplay()
+			}
 
 		case KeyArrowUp:
+			// Navigate history and refresh to show selected entry
 			le.navigateHistory(-1)
+			le.refreshDisplay()
 
 		case KeyArrowDown:
+			// Navigate history and refresh to show selected entry
 			le.navigateHistory(1)
+			le.refreshDisplay()
 
 		case KeyTab:
 			// TODO: Implement tab completion

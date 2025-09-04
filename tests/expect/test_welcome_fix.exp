@@ -1,10 +1,14 @@
 #!/usr/bin/expect
 
+# Determine repo root from this script location (tests/expect -> repo root)
+set script_dir [file dirname [info script]]
+set root [file normalize [file join $script_dir .. ..]]
+
 # Set timeout
 set timeout 30
 
 # Start rigel with welcome fix
-spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama ./rigel-welcome-fix --termflow
+spawn env RIGEL_TEST_MODE=1 PROVIDER=ollama [file join $root rigel-welcome-fix] --termflow
 
 # Wait for welcome message and prompt
 expect "✦ Rigel - AI Coding Agent"
