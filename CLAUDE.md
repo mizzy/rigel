@@ -110,7 +110,7 @@ gh pr create --title "feat: Description" --body "Detailed description"
 **Termflow UI** (`lib/termflow/` + `internal/ui/termflow/`)
 - Custom terminal library that preserves scrollback buffer
 - Raw terminal mode with advanced line editing capabilities
-- Multiline input support with `...` syntax
+- Multiline editing with `Ctrl+J` to insert newlines
 - History navigation (Up/Down arrows) with file persistence
 - Tab completion for commands and models
 - Two-press Ctrl+C exit pattern (first press cancels input, second exits)
@@ -239,10 +239,10 @@ This provides the AI agent with deep understanding of:
 ## Important Implementation Details
 
 ### Terminal UI Specifics
-- **Termflow Mode**: Preserves scrollback, multiline with `...`, history navigation
+- **Termflow Mode**: Preserves scrollback, multiline via `Ctrl+J`, history navigation
 - **Bubbletea Mode**: Modal interfaces, spinner feedback, structured output
 - **Colors**: Rigel theme with blue (#5793ff) highlights
-- **Input**: Tab completion, Alt+Enter for multiline (bubbletea only)
+- **Input**: Tab completion, Alt+Enter/Ctrl+J for multiline (bubbletea handles Alt+Enter)
 
 ### Security and Sandboxing
 - **macOS Sandbox**: Auto-enabled, restricts writes to current directory + `.rigel/`

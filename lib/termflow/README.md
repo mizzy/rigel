@@ -9,7 +9,7 @@ termflow is designed to solve the scrollback history limitation found in full TU
 ## Key Features
 
 - **Scrollback Preservation**: Chat history and output are preserved in the terminal's scrollback buffer
-- **Multiline Input**: Support for both single-line and multiline input with intuitive syntax
+- **Multiline Input**: Single-line and multiline editing; press `Ctrl+J` to insert newlines
 - **Input History**: Persistent command history with file storage
 - **Tab Completion**: Configurable command completion
 - **Minimal Dependencies**: Uses only Go standard library plus `golang.org/x/term` for advanced features
@@ -60,23 +60,19 @@ func main() {
 
 ### Multiline Input
 
-termflow supports intuitive multiline input:
+termflow supports multiline editing directly. In interactive mode, use `Ctrl+J` to insert a newline and `Enter` to submit:
 
 ```go
-// Automatic detection: end first line with "..."
+// Interactive input (supports Ctrl+J for newlines)
 input, err := client.ReadLineOrMultiLine()
-// User types: "Write a function..."
-// System switches to multiline mode automatically
 
-// Explicit multiline input
-multiInput, err := client.ReadMultiLine()
-// Always prompts for multiline input
+// Explicit prompt-driven multiline input is also available
+multiInput, err := client.ReadMultiLine() // finish with '.' on a blank line or Ctrl+D
 ```
 
-**Usage patterns:**
-- Single line: `Hello world` → single line input
-- Multiline trigger: `Write a function...` → continues on next lines
-- End multiline: Type `.` on empty line or press Ctrl+D
+Notes:
+- Press `Ctrl+J` to add a newline while typing; press `Enter` to submit.
+- `ReadMultiLine()` provides a guided multiline mode and ends on `.` or Ctrl+D.
 
 ### Interactive Features
 

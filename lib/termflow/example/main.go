@@ -45,8 +45,7 @@ func main() {
 	client.Printf("  /history - Show input history\n")
 	client.Printf("  /multiline - Test multiline input\n")
 	client.Printf("  /quit - Exit\n")
-	client.Printf("\nFor multiline input, end your first line with '...'\n")
-	client.Printf("Example: 'Write a function...' then continue on next lines\n\n")
+	client.Printf("\nTips: Press Ctrl+J to insert a newline while typing.\n\n")
 
 	// Main loop
 mainLoop:
@@ -73,7 +72,7 @@ mainLoop:
 			client.Printf("  /multiline - Test multiline input\n")
 			client.Printf("  /clear     - Clear the screen\n")
 			client.Printf("  /quit      - Exit the application\n")
-			client.Printf("\nFor multiline input, end your first line with '...'\n\n")
+			client.Printf("\nTip: Use Ctrl+J for a newline; Enter submits.\n\n")
 
 		case input == "/history":
 			entries := history.GetLatest(10)
