@@ -157,7 +157,7 @@ func (cs *ChatSession) showWelcome() {
 		cs.client.Printf("  \033[38;2;87;147;255m%s\033[0m \033[38;5;117m(%s)\033[0m\n", cs.gitInfo.RepoName, cs.gitInfo.Branch)
 	}
 	cs.client.Printf("  Using termflow UI - terminal scrollback is preserved!\n")
-	cs.client.Printf("  \033[90mInput:\033[0m Single line or end with '...' for multi-line\n")
+	cs.client.Printf("  \033[90mInput:\033[0m Single line; use Ctrl+J for newline\n")
 	cs.client.Printf("  \033[90mCommands:\033[0m Type / for commands (Ctrl+C to exit)\n\n")
 }
 

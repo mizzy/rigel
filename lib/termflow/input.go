@@ -2,7 +2,6 @@ package termflow
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -96,7 +95,7 @@ func (ic *InteractiveClient) ReadLineOrMultiLine() (string, error) {
 	// Set history in line editor
 	ic.lineEditor.SetHistory(ic.history)
 
-	// Use line editor for first line input
+	// Use line editor for input (supports Ctrl+J for newlines)
 	line, err := ic.lineEditor.ReadLineWithHistory()
 	if err != nil {
 		// For interruption, return error immediately without fallback
@@ -107,55 +106,7 @@ func (ic *InteractiveClient) ReadLineOrMultiLine() (string, error) {
 		return ic.Client.ReadLineOrMultiLine()
 	}
 
-	// Check if user wants multiline input
-	if strings.HasSuffix(line, "...") {
-		// Remove the "..." marker and start multiline input
-		firstLine := strings.TrimSuffix(line, "...")
-
-		var lines []string
-		if strings.TrimSpace(firstLine) != "" {
-			lines = append(lines, firstLine)
-		}
-
-		ic.Printf("Continue typing (type '.' on empty line or Ctrl+D to finish):\n")
-		lineNum := 2
-
-		for {
-			// Show continuation prompt - use regular reader for continuation lines
-			fmt.Fprintf(ic.output, "%2d> ", lineNum)
-
-			nextLine, err := ic.reader.ReadString('\n')
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				return "", err
-			}
-
-			// Clean up the line
-			nextLine = strings.TrimSuffix(nextLine, "\n")
-			nextLine = strings.TrimSuffix(nextLine, "\r")
-
-			// Check for end marker
-			if nextLine == "." {
-				break
-			}
-
-			lines = append(lines, nextLine)
-			lineNum++
-		}
-
-		result := strings.Join(lines, "\n")
-
-		// Add to history if not empty
-		if strings.TrimSpace(result) != "" {
-			ic.addToHistory(result)
-		}
-
-		return result, nil
-	}
-
-	// Single line input - add to history
+	// Add to history if not empty
 	if strings.TrimSpace(line) != "" {
 		ic.addToHistory(line)
 	}
@@ -168,7 +119,7 @@ func (ic *InteractiveClient) ReadLineOrMultiLineWithoutPrompt() (string, error) 
 	// Set history in line editor
 	ic.lineEditor.SetHistory(ic.history)
 
-	// Use line editor for first line input without initial prompt
+	// Use line editor for input without initial prompt (supports Ctrl+J for newlines)
 	line, err := ic.lineEditor.ReadLineWithoutPrompt()
 	if err != nil {
 		// For interruption, return error immediately without fallback
@@ -179,55 +130,7 @@ func (ic *InteractiveClient) ReadLineOrMultiLineWithoutPrompt() (string, error) 
 		return ic.Client.ReadLineOrMultiLine()
 	}
 
-	// Check if user wants multiline input (same logic as ReadLineOrMultiLine)
-	if strings.HasSuffix(line, "...") {
-		// Remove the "..." marker and start multiline input
-		firstLine := strings.TrimSuffix(line, "...")
-
-		var lines []string
-		if strings.TrimSpace(firstLine) != "" {
-			lines = append(lines, firstLine)
-		}
-
-		ic.Printf("Continue typing (type '.' on empty line or Ctrl+D to finish):\n")
-		lineNum := 2
-
-		for {
-			// Show continuation prompt - use regular reader for continuation lines
-			fmt.Fprintf(ic.output, "%2d> ", lineNum)
-
-			nextLine, err := ic.reader.ReadString('\n')
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				return "", err
-			}
-
-			// Clean up the line
-			nextLine = strings.TrimSuffix(nextLine, "\n")
-			nextLine = strings.TrimSuffix(nextLine, "\r")
-
-			// Check for end marker
-			if nextLine == "." {
-				break
-			}
-
-			lines = append(lines, nextLine)
-			lineNum++
-		}
-
-		result := strings.Join(lines, "\n")
-
-		// Add to history if not empty
-		if strings.TrimSpace(result) != "" {
-			ic.addToHistory(result)
-		}
-
-		return result, nil
-	}
-
-	// Single line input - add to history
+	// Add to history if not empty
 	if strings.TrimSpace(line) != "" {
 		ic.addToHistory(line)
 	}

@@ -90,23 +90,11 @@ func TestMultilineInput(t *testing.T) {
 
     tt.Wait(500 * time.Millisecond)
 
-    // Trigger multiline input
-    tt.SendKeys("Write a function...")
-    tt.SendEnter()
-
-    // Verify continuation prompt
-    tt.ExpectOutput("Continue typing")
-    tt.ExpectPattern(`\d+>`) // Line number prompt like "2>"
-
-    // Enter additional lines
+    // Type first line, then insert a newline with Ctrl+J
     tt.SendKeys("def hello():")
-    tt.SendEnter()
+    tt.SendCtrlJ() // Insert newline without submitting
     tt.SendKeys("    print('Hello')")
-    tt.SendEnter()
-
-    // End marker
-    tt.SendKeys(".")
-    tt.SendEnter()
+    tt.SendEnter() // Submit the multiline input
 
     tt.ExpectThinking()
 }

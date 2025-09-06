@@ -138,13 +138,13 @@ func (c *Client) ReadMultiLine() (string, error) {
 	return result, nil
 }
 
-// ReadLineOrMultiLine reads input and automatically detects if user wants multiline input.
-// If the line ends with "...", it switches to multiline mode.
+// ReadLineOrMultiLine reads user input.
+// In interactive mode, multiline editing is supported via Ctrl+J.
 func (c *Client) ReadLineOrMultiLine() (string, error) {
 	// Show prompt
 	fmt.Fprint(c.output, c.prompt)
 
-	// Read first line
+	// Read a line (base client cannot intercept Ctrl+J newlines in canonical mode)
 	line, err := c.reader.ReadString('\n')
 	if err != nil {
 		return "", err
@@ -154,56 +154,7 @@ func (c *Client) ReadLineOrMultiLine() (string, error) {
 	line = strings.TrimSuffix(line, "\n")
 	line = strings.TrimSuffix(line, "\r")
 
-	// Check if user wants multiline input
-	if strings.HasSuffix(line, "...") {
-		// Remove the "..." marker and start multiline input
-		firstLine := strings.TrimSuffix(line, "...")
-
-		var lines []string
-		if strings.TrimSpace(firstLine) != "" {
-			lines = append(lines, firstLine)
-		}
-
-		c.Printf("Continue typing (type '.' on empty line or Ctrl+D to finish):\n")
-		lineNum := 2
-
-		for {
-			// Show continuation prompt
-			fmt.Fprintf(c.output, "%2d> ", lineNum)
-
-			// Read line
-			nextLine, err := c.reader.ReadString('\n')
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				return "", err
-			}
-
-			// Clean up the line
-			nextLine = strings.TrimSuffix(nextLine, "\n")
-			nextLine = strings.TrimSuffix(nextLine, "\r")
-
-			// Check for end marker
-			if nextLine == "." {
-				break
-			}
-
-			lines = append(lines, nextLine)
-			lineNum++
-		}
-
-		result := strings.Join(lines, "\n")
-
-		// Add to history if not empty
-		if strings.TrimSpace(result) != "" {
-			c.addToHistory(result)
-		}
-
-		return result, nil
-	}
-
-	// Single line input
+	// Add to history if not empty
 	if strings.TrimSpace(line) != "" {
 		c.addToHistory(line)
 	}
