@@ -1,21 +1,23 @@
 # See https://pre-commit.com for more information
+# Exclude non-repo directories from all hooks
+exclude: ^(\.gomodcache/|vendor/|bin/|third_party/)
 repos:
   # Go hooks
   - repo: local
     hooks:
       - id: go-fmt
         name: go fmt
-        entry: bash -c 'gofmt -l -w .'
+        entry: gofmt
+        args: ["-l", "-w"]
         language: system
         types: [go]
-        pass_filenames: false
 
       - id: go-imports
         name: goimports
-        entry: bash -c 'goimports -l -w .'
+        entry: goimports
+        args: ["-l", "-w"]
         language: system
         types: [go]
-        pass_filenames: false
 
       - id: go-vet
         name: go vet
