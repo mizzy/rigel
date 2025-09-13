@@ -183,7 +183,7 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 		case KeyArrowUp:
 			if le.completionsVisible {
 				if le.completionSelector.MoveUp() {
-					le.showOrUpdateCompletions()
+					le.refreshDisplay()
 				}
 				continue
 			}
@@ -194,7 +194,7 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 		case KeyArrowDown:
 			if le.completionsVisible {
 				if le.completionSelector.MoveDown() {
-					le.showOrUpdateCompletions()
+					le.refreshDisplay()
 				}
 				continue
 			}
@@ -259,7 +259,7 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 			}
 			le.completionSelector.SetItems(items)
 			le.completionsVisible = true
-			le.showOrUpdateCompletions()
+			le.refreshDisplay()
 			continue
 
 		case KeyCtrlJ:
@@ -437,43 +437,7 @@ func (le *LineEditor) refreshDisplay() {
 	le.completionLines = printedCompletionLines
 }
 
-// showOrUpdateCompletions renders the current completion list below the input while preserving cursor
-func (le *LineEditor) showOrUpdateCompletions() {
-	// Clear exactly the previously drawn completion block to avoid duplication/scroll
-	le.clearCompletions()
-
-	// Save cursor position (CSI s for compatibility)
-	fmt.Fprint(le.client.output, "\033[s")
-
-	// Move to the bottom of the input block
-	lines := strings.Split(le.line, "\n")
-	textBeforeCursor := le.line[:le.cursor]
-	linesBeforeCursor := strings.Split(textBeforeCursor, "\n")
-	currentLineIndex := len(linesBeforeCursor) - 1
-	down := len(lines) - 1 - currentLineIndex
-	if down > 0 {
-		fmt.Fprintf(le.client.output, "\033[%dB", down)
-	}
-	// Move exactly one line below the input start and return to column 0
-	fmt.Fprint(le.client.output, "\033[1B\r")
-
-	// Clear from cursor to end of screen to remove any prior completion remnants
-	fmt.Fprint(le.client.output, "\033[J")
-
-	// Render completions without trailing blank line
-	raw := le.completionSelector.RenderCompletions(8)
-	block := strings.TrimRight(raw, "\n")
-	if block != "" {
-		fmt.Fprint(le.client.output, block)
-		// Count visual lines (lines = number of '\n' + 1)
-		le.completionLines = strings.Count(block, "\n") + 1
-	} else {
-		le.completionLines = 0
-	}
-
-	// Restore cursor position (CSI u)
-	fmt.Fprint(le.client.output, "\033[u")
-}
+// (no-op) legacy completion updater removed; integrated rendering handles it
 
 // clearCompletions clears the completion block below the input
 func (le *LineEditor) clearCompletions() {
