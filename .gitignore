@@ -5,6 +5,7 @@
 *.so
 *.dylib
 /rigel
+rigel-*
 
 # Test binary, built with `go test -c`
 *.test
