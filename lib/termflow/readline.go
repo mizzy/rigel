@@ -23,6 +23,12 @@ type LineEditor struct {
 	cursorOnExitLine bool        // Track if cursor is positioned on the line above exit message
 	ctrlCTimer       *time.Timer // Timer to reset Ctrl+C state after 1 second
 	displayedLines   int         // Track how many lines we've displayed
+
+	// Completion UI state
+	completionSelector   *CompletionSelector
+	completionsVisible   bool
+	completionLines      int
+	completionTokenStart int
 }
 
 // NewLineEditor creates a new line editor
@@ -33,14 +39,17 @@ func NewLineEditor(client *Client) (*LineEditor, error) {
 	}
 
 	return &LineEditor{
-		client:         client,
-		keyboard:       keyboard,
-		history:        []string{},
-		historyIndex:   -1,
-		line:           "",
-		cursor:         0,
-		prompt:         client.prompt,
-		displayedLines: 0,
+		client:             client,
+		keyboard:           keyboard,
+		history:            []string{},
+		historyIndex:       -1,
+		line:               "",
+		cursor:             0,
+		prompt:             client.prompt,
+		displayedLines:     0,
+		completionSelector: NewCompletionSelector(),
+		completionsVisible: false,
+		completionLines:    0,
 	}, nil
 }
 
@@ -76,6 +85,12 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 
 		switch key.Type {
 		case KeyEnter:
+			// If completion menu is visible, accept the selection
+			if le.completionsVisible {
+				if le.applySelectedCompletion() {
+					continue
+				}
+			}
 			// Finish input
 			fmt.Fprint(le.client.output, "\n")
 			result := le.line
@@ -136,6 +151,7 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 		case KeyBackspace:
 			// Update buffer then refresh display so character disappears visually
 			if le.cursor > 0 {
+				le.hideCompletionsIfVisible()
 				le.handleBackspace()
 				le.refreshDisplay()
 			}
@@ -143,6 +159,7 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 		case KeyDelete:
 			// Update buffer then refresh display to reflect deletion
 			if le.cursor < len(le.line) {
+				le.hideCompletionsIfVisible()
 				le.handleDelete()
 				le.refreshDisplay()
 			}
@@ -150,6 +167,7 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 		case KeyArrowLeft:
 			// Move cursor and refresh to reposition visibly (supports multiline)
 			if le.cursor > 0 {
+				le.hideCompletionsIfVisible()
 				le.moveCursorLeft()
 				le.refreshDisplay()
 			}
@@ -157,21 +175,40 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 		case KeyArrowRight:
 			// Move cursor and refresh to reposition visibly (supports multiline)
 			if le.cursor < len(le.line) {
+				le.hideCompletionsIfVisible()
 				le.moveCursorRight()
 				le.refreshDisplay()
 			}
 
 		case KeyArrowUp:
+			if le.completionsVisible {
+				if le.completionSelector.MoveUp() {
+					le.showOrUpdateCompletions()
+				}
+				continue
+			}
 			// Navigate history and refresh to show selected entry
 			le.navigateHistory(-1)
 			le.refreshDisplay()
 
 		case KeyArrowDown:
+			if le.completionsVisible {
+				if le.completionSelector.MoveDown() {
+					le.showOrUpdateCompletions()
+				}
+				continue
+			}
 			// Navigate history and refresh to show selected entry
 			le.navigateHistory(1)
 			le.refreshDisplay()
 
 		case KeyTab:
+			// If completions are visible, accept the current selection
+			if le.completionsVisible {
+				if le.applySelectedCompletion() {
+					continue
+				}
+			}
 			// Implement tab completion using client's completionFunc
 			// Determine the current token (from last whitespace/newline to cursor)
 			start := le.cursor
@@ -214,29 +251,26 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 				continue
 			}
 
-			// No further extension; show the list of completions below aligned to column 0
-			fmt.Fprint(le.client.output, "\n\r")
-			fmt.Fprint(le.client.output, "Completions:\n")
-			for i, c := range candidates {
-				marker := "  "
-				if i == 0 {
-					marker = "▶ "
-				}
-				fmt.Fprintf(le.client.output, "\r%s%s\n", marker, c)
+			// No further extension; show interactive list below input
+			le.completionTokenStart = start
+			items := make([]CompletionItem, 0, len(candidates))
+			for _, c := range candidates {
+				items = append(items, CompletionItem{Text: c})
 			}
-			fmt.Fprint(le.client.output, "\r\n")
-			// Render a fresh prompt+input below the list without trying to clear above
-			le.displayedLines = 0
-			le.refreshDisplay()
+			le.completionSelector.SetItems(items)
+			le.completionsVisible = true
+			le.showOrUpdateCompletions()
 			continue
 
 		case KeyCtrlJ:
 			// Insert newline for multiline input
+			le.hideCompletionsIfVisible()
 			le.insertRune('\n')
 			le.refreshDisplay()
 			continue
 
 		case KeyRune:
+			le.hideCompletionsIfVisible()
 			le.insertRune(key.Rune)
 
 			// Use smart refresh: simple echo for single-line, no refresh for multiline character input
@@ -378,6 +412,94 @@ func (le *LineEditor) refreshDisplay() {
 	}
 
 	le.displayedLines = len(lines)
+}
+
+// showOrUpdateCompletions renders the current completion list below the input while preserving cursor
+func (le *LineEditor) showOrUpdateCompletions() {
+	// Clear previous list if present
+	if le.completionLines > 0 {
+		le.clearCompletions()
+	}
+
+	// Save cursor position
+	fmt.Fprint(le.client.output, "\0337")
+
+	// Move to the bottom of the input block
+	lines := strings.Split(le.line, "\n")
+	textBeforeCursor := le.line[:le.cursor]
+	linesBeforeCursor := strings.Split(textBeforeCursor, "\n")
+	currentLineIndex := len(linesBeforeCursor) - 1
+	down := len(lines) - 1 - currentLineIndex
+	if down > 0 {
+		fmt.Fprintf(le.client.output, "\033[%dB", down)
+	}
+
+	// Move to next line and render completions
+	fmt.Fprint(le.client.output, "\n\r")
+	block := le.completionSelector.RenderCompletions(8)
+	fmt.Fprint(le.client.output, "\r")
+	fmt.Fprint(le.client.output, block)
+	le.completionLines = strings.Count(block, "\n")
+
+	// Restore cursor position
+	fmt.Fprint(le.client.output, "\0338")
+}
+
+// clearCompletions clears the completion block below the input
+func (le *LineEditor) clearCompletions() {
+	if le.completionLines <= 0 {
+		return
+	}
+	// Save cursor
+	fmt.Fprint(le.client.output, "\0337")
+
+	// Move to the bottom of the input block
+	lines := strings.Split(le.line, "\n")
+	textBeforeCursor := le.line[:le.cursor]
+	linesBeforeCursor := strings.Split(textBeforeCursor, "\n")
+	currentLineIndex := len(linesBeforeCursor) - 1
+	down := len(lines) - 1 - currentLineIndex
+	if down > 0 {
+		fmt.Fprintf(le.client.output, "\033[%dB", down)
+	}
+	// Move to the first line of completions (line after input)
+	fmt.Fprint(le.client.output, "\n\r")
+	for i := 0; i < le.completionLines; i++ {
+		fmt.Fprint(le.client.output, "\r\033[K")
+		if i < le.completionLines-1 {
+			fmt.Fprint(le.client.output, "\n")
+		}
+	}
+
+	// Restore cursor
+	fmt.Fprint(le.client.output, "\0338")
+	le.completionLines = 0
+}
+
+// hideCompletionsIfVisible clears and hides the completion list if shown
+func (le *LineEditor) hideCompletionsIfVisible() {
+	if le.completionsVisible {
+		le.clearCompletions()
+		le.completionsVisible = false
+		le.completionSelector.Clear()
+	}
+}
+
+// applySelectedCompletion inserts the selected completion text
+func (le *LineEditor) applySelectedCompletion() bool {
+	if !le.completionsVisible {
+		return false
+	}
+	sel := le.completionSelector.GetSelectedItem()
+	if sel == nil {
+		return false
+	}
+	start := le.completionTokenStart
+	le.line = le.line[:start] + sel.Text + le.line[le.cursor:]
+	le.cursor = start + len(sel.Text)
+	le.hideCompletionsIfVisible()
+	le.refreshDisplay()
+	return true
 }
 
 // refreshDisplayWithoutPrompt redraws the current line(s) without showing the prompt
