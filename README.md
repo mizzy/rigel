@@ -100,7 +100,7 @@ RIGEL_LOG_LEVEL=info
 
 ## Usage
 
-### Interactive Chat Mode
+### Interactive Chat Mode (Termflow UI)
 
 Rigel features a clean and simple chat interface for AI-assisted coding:
 
@@ -158,7 +158,7 @@ To read a file in Go, you have several options. Here's the most common approach 
       return os.ReadFile(path)
   }
 
-✦ █ Type a message or / for commands (Alt+Enter for new line)
+✦ █ Type a message or / for commands (Ctrl+J for new line)
 ```
 
 ### Non-Interactive Mode
@@ -207,10 +207,7 @@ rigel/
     │   └── llm.go          # LLM configuration and selection
     ├── tools/           # Tool integrations (planned)
     ├── ui/              # Terminal UI components
-    │   ├── handlers/       # Input event handlers
-    │   ├── render/         # UI rendering logic
-    │   ├── styles/         # Color schemes and styling
-    │   └── terminal/       # Main terminal interface
+    │   └── termflow/       # Termflow chat session (default UI)
     └── version/         # Version information
 ```
 

@@ -9,14 +9,12 @@ import (
 	"runtime"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mizzy/rigel/internal/agent"
 	"github.com/mizzy/rigel/internal/config"
 	"github.com/mizzy/rigel/internal/llm"
 	"github.com/mizzy/rigel/internal/sandbox"
 	"github.com/mizzy/rigel/internal/tools"
 	termflowui "github.com/mizzy/rigel/internal/ui/termflow"
-	"github.com/mizzy/rigel/internal/ui/terminal"
 	"github.com/mizzy/rigel/internal/version"
 	"github.com/spf13/cobra"
 )
@@ -25,7 +23,6 @@ var (
 	cfg           *config.Config
 	sandboxFlag   bool
 	noSandboxFlag bool
-	termflowFlag  bool
 )
 
 func main() {
@@ -104,24 +101,10 @@ review, and improve code through natural language interactions.`,
 			fmt.Print(response)
 			os.Stdout.Sync() // Ensure output is flushed
 		} else {
-			// Choose chat mode based on flag
-			if termflowFlag {
-				runTermflowChatMode(provider)
-			} else {
-				// Run interactive chat mode (inline, no alternate screen)
-				runChatMode(provider)
-			}
+			// Default to termflow UI (preserves scrollback)
+			runTermflowChatMode(provider)
 		}
 	},
-}
-
-func runChatMode(provider llm.Provider) {
-	model := terminal.NewModel(provider, cfg)
-	p := tea.NewProgram(model, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
-
-	if _, err := p.Run(); err != nil {
-		log.Fatalf("Error running chat: %v", err)
-	}
 }
 
 func runTermflowChatMode(provider llm.Provider) {
@@ -139,7 +122,6 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.Flags().BoolVar(&sandboxFlag, "sandbox", false, "Force enable sandbox mode (default on macOS)")
 	rootCmd.Flags().BoolVar(&noSandboxFlag, "no-sandbox", false, "Disable sandbox mode explicitly")
-	rootCmd.Flags().BoolVar(&termflowFlag, "termflow", false, "Use termflow UI instead of bubbletea (preserves terminal scrollback)")
 }
 
 func shouldEnableSandboxByDefault() bool {
