@@ -416,8 +416,8 @@ func (le *LineEditor) refreshDisplay() {
 
 // showOrUpdateCompletions renders the current completion list below the input while preserving cursor
 func (le *LineEditor) showOrUpdateCompletions() {
-	// Aggressively clear any prior completion area to avoid duplicates/blank lines
-	le.clearCompletionArea(24)
+	// Clear exactly the previously drawn completion block to avoid duplication/scroll
+	le.clearCompletions()
 
 	// Save cursor position
 	fmt.Fprint(le.client.output, "\0337")
