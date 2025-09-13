@@ -479,11 +479,11 @@ func (le *LineEditor) clearCompletionArea(maxLines int) {
 	// Move to first completion line
 	fmt.Fprint(le.client.output, "\033[1B\r")
 
-	// Clear requested number of lines
+	// Clear requested number of lines without introducing newlines
 	for i := 0; i < maxLines; i++ {
-		fmt.Fprint(le.client.output, "\033[K")
+		fmt.Fprint(le.client.output, "\r\033[K")
 		if i < maxLines-1 {
-			fmt.Fprint(le.client.output, "\n\r")
+			fmt.Fprint(le.client.output, "\033[1B")
 		}
 	}
 
