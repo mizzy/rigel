@@ -400,7 +400,7 @@ func (le *LineEditor) refreshDisplay() {
 
 	// Anchor to top-of-input (restore if exists, else move up by currentLineIndex)
 	if le.anchorSaved {
-		fmt.Fprint(le.client.output, "\033[u")
+		fmt.Fprint(le.client.output, "\x1b8")
 	} else {
 		if currentLineIndex > 0 {
 			fmt.Fprintf(le.client.output, "\033[%dA", currentLineIndex)
@@ -471,7 +471,7 @@ func (le *LineEditor) refreshDisplay() {
 	if currentLineIndex > 0 {
 		fmt.Fprintf(le.client.output, "\033[%dA", currentLineIndex)
 	}
-	fmt.Fprint(le.client.output, "\r\033[s")
+	fmt.Fprint(le.client.output, "\r\x1b7")
 	if currentLineIndex > 0 {
 		fmt.Fprintf(le.client.output, "\033[%dB", currentLineIndex)
 	}
@@ -495,8 +495,8 @@ func (le *LineEditor) clearCompletionArea(maxLines int) {
 	if maxLines <= 0 {
 		maxLines = 1
 	}
-	// Save cursor (CSI s)
-	fmt.Fprint(le.client.output, "\033[s")
+	// Save cursor (DECSC)
+	fmt.Fprint(le.client.output, "\x1b7")
 
 	// Move to the bottom of the input block
 	lines := strings.Split(le.line, "\n")
@@ -510,8 +510,8 @@ func (le *LineEditor) clearCompletionArea(maxLines int) {
 	// Move to first completion line and clear to end of screen
 	fmt.Fprint(le.client.output, "\033[1B\r\033[J")
 
-	// Restore cursor (CSI u)
-	fmt.Fprint(le.client.output, "\033[u")
+	// Restore cursor (DECRC)
+	fmt.Fprint(le.client.output, "\x1b8")
 }
 
 // hideCompletionsIfVisible clears and hides the completion list if shown
