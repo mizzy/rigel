@@ -429,24 +429,27 @@ func (le *LineEditor) refreshDisplay() {
 		}
 	}
 
-	// Draw input
+	// Draw input (no newlines)
 	fmt.Fprint(le.client.output, le.prompt)
 	fmt.Fprint(le.client.output, lines[0])
 	for i := 1; i < len(lines); i++ {
-		fmt.Fprint(le.client.output, "\n\r  ")
+		fmt.Fprint(le.client.output, "\033[1B\r\033[K  ")
 		fmt.Fprint(le.client.output, lines[i])
 	}
 
-	// Draw completions vertically below input when visible
+	// Draw completions vertically below input when visible (no newlines)
 	if newCompletionLines > 0 {
 		items := le.completionSelector.items
-		fmt.Fprint(le.client.output, "\n\rCompletions:\n")
+		// Header
+		fmt.Fprint(le.client.output, "\033[1B\r\033[KCompletions:")
+		// Items
 		for i := start; i < end; i++ {
 			marker := "  "
 			if i == le.completionSelector.selectedIndex {
 				marker = "▶ "
 			}
-			fmt.Fprintf(le.client.output, "\r%s%s\n", marker, items[i].Text)
+			fmt.Fprint(le.client.output, "\033[1B\r\033[K")
+			fmt.Fprintf(le.client.output, "%s%s", marker, items[i].Text)
 		}
 	}
 
