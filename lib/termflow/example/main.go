@@ -45,7 +45,7 @@ func main() {
 	client.Printf("  /history - Show input history\n")
 	client.Printf("  /multiline - Test multiline input\n")
 	client.Printf("  /quit - Exit\n")
-	client.Printf("\nTips: Press Ctrl+J to insert a newline while typing.\n\n")
+	client.Printf("\nTips: Press Tab to complete /commands; Ctrl+J inserts a newline.\n\n")
 
 	// Main loop
 mainLoop:

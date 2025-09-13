@@ -172,7 +172,62 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 			le.refreshDisplay()
 
 		case KeyTab:
-			// TODO: Implement tab completion
+			// Implement tab completion using client's completionFunc
+			// Determine the current token (from last whitespace/newline to cursor)
+			start := le.cursor
+			for start > 0 {
+				r := le.line[start-1]
+				if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+					break
+				}
+				start--
+			}
+
+			prefix := le.line[start:le.cursor]
+
+			if le.client.completionFunc == nil {
+				continue
+			}
+
+			candidates := le.client.completionFunc(prefix)
+			if len(candidates) == 0 {
+				// No completions; nothing to do
+				continue
+			}
+
+			// If exactly one candidate, complete it directly
+			if len(candidates) == 1 {
+				completion := candidates[0]
+				// Replace current token with completion
+				le.line = le.line[:start] + completion + le.line[le.cursor:]
+				le.cursor = start + len(completion)
+				le.refreshDisplay()
+				continue
+			}
+
+			// Multiple candidates: extend to longest common prefix
+			lcp := longestCommonPrefix(candidates)
+			if len(lcp) > len(prefix) {
+				le.line = le.line[:start] + lcp + le.line[le.cursor:]
+				le.cursor = start + len(lcp)
+				le.refreshDisplay()
+				continue
+			}
+
+			// No further extension; show the list of completions below aligned to column 0
+			fmt.Fprint(le.client.output, "\n\r")
+			fmt.Fprint(le.client.output, "Completions:\n")
+			for i, c := range candidates {
+				marker := "  "
+				if i == 0 {
+					marker = "▶ "
+				}
+				fmt.Fprintf(le.client.output, "\r%s%s\n", marker, c)
+			}
+			fmt.Fprint(le.client.output, "\r\n")
+			// Render a fresh prompt+input below the list without trying to clear above
+			le.displayedLines = 0
+			le.refreshDisplay()
 			continue
 
 		case KeyCtrlJ:
@@ -591,4 +646,25 @@ func (le *LineEditor) stopCtrlCTimer() {
 		le.ctrlCTimer.Stop()
 		le.ctrlCTimer = nil
 	}
+}
+
+// longestCommonPrefix returns the longest common prefix among the given strings.
+func longestCommonPrefix(strs []string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	prefix := strs[0]
+	for _, s := range strs[1:] {
+		// Trim prefix until it matches the beginning of s
+		for !strings.HasPrefix(s, prefix) {
+			if len(prefix) == 0 {
+				return ""
+			}
+			// Reduce prefix by one rune to handle multibyte characters safely
+			// Though our inputs are ASCII commands like "/help", keep it generic
+			_, size := utf8.DecodeLastRuneInString(prefix)
+			prefix = prefix[:len(prefix)-size]
+		}
+	}
+	return prefix
 }
