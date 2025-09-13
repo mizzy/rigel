@@ -16,9 +16,8 @@ make run                      # Run without building (go run cmd/rigel/main.go)
 make dev                      # Download deps + build + run
 PROVIDER=ollama ./bin/rigel   # Run with specific provider
 
-# Run with different UI modes
-./bin/rigel --termflow        # Use termflow UI (preserves scrollback)
-./bin/rigel                   # Use bubbletea UI (default)
+# Run (Termflow UI is default)
+./bin/rigel                   # Termflow UI (preserves scrollback)
 
 # Security options
 ./bin/rigel --sandbox         # Force enable sandbox mode (macOS)
@@ -37,7 +36,6 @@ go test ./...                 # Standard test run
 
 # Run tests for specific packages
 go test ./internal/llm -v              # Test LLM package
-go test ./internal/ui/terminal -v      # Test Terminal UI
 go test ./internal/ui/termflow -v      # Test Termflow UI
 go test ./lib/termflow -v              # Test Termflow library
 
@@ -105,9 +103,9 @@ gh pr create --title "feat: Description" --body "Detailed description"
 
 ## High-Level Architecture
 
-### Dual UI System
+### UI System
 
-**Termflow UI** (`lib/termflow/` + `internal/ui/termflow/`)
+**Termflow UI** (`lib/termflow/` + `internal/ui/termflow/`) — Default
 - Custom terminal library that preserves scrollback buffer
 - Raw terminal mode with advanced line editing capabilities
 - Multiline editing with `Ctrl+J` to insert newlines
@@ -116,11 +114,7 @@ gh pr create --title "feat: Description" --body "Detailed description"
 - Two-press Ctrl+C exit pattern (first press cancels input, second exits)
 - PTY-based testing framework (`lib/termflow/uitest/`)
 
-**Terminal UI** (`internal/ui/terminal/`)
-- Traditional Bubbletea-based interface with inline mode
-- Modal interfaces for provider/model selection
-- Spinner animations and structured output
-- No alternate screen mode (preserves terminal history)
+// Bubbletea-based UI has been removed; termflow is the only UI.
 
 ### Core Systems
 
@@ -162,10 +156,8 @@ gh pr create --title "feat: Description" --body "Detailed description"
 
 ### Key Design Patterns
 
-**UI Mode Selection**:
-- `--termflow` flag enables termflow UI (recommended for scrollback preservation)
-- Default uses bubbletea UI for compatibility
-- Both UIs share same agent/tool backend systems
+**UI Mode**:
+- Termflow is the default and only UI (preserves terminal scrollback)
 
 **Provider and Model Management**:
 - Default provider: `ollama` for out-of-box experience
@@ -203,7 +195,6 @@ RIGEL_TEST_MODE=1               # Enable test mode for UI testing
 
 **Command Line Flags**:
 ```bash
---termflow      # Use termflow UI (recommended)
 --sandbox       # Force enable sandbox mode
 --no-sandbox    # Disable sandbox mode
 --version       # Show version information
