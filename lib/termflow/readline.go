@@ -28,6 +28,7 @@ type LineEditor struct {
 	completionSelector   *CompletionSelector
 	completionsVisible   bool
 	completionLines      int
+	anchorSaved          bool
 	completionTokenStart int
 }
 
@@ -73,6 +74,8 @@ func (le *LineEditor) ReadLineWithHistory() (string, error) {
 	le.cursor = 0
 	le.historyIndex = -1
 	le.displayedLines = 0
+	le.anchorSaved = false
+	le.anchorSaved = false
 
 	// Show initial prompt
 	le.refreshDisplay()
@@ -371,26 +374,13 @@ func (le *LineEditor) refreshDisplay() {
 	currentLineIndex := len(linesBeforeCursor) - 1
 	currentColumn := len(linesBeforeCursor[len(linesBeforeCursor)-1])
 
-	// Move to the first input line from current cursor, then clear to end-of-screen
-	if currentLineIndex > 0 {
-		fmt.Fprintf(le.client.output, "\033[%dA", currentLineIndex)
-	}
-	fmt.Fprint(le.client.output, "\r\033[J")
-
-	// Draw fresh content (no leading newline; spacer is provided by welcome)
-	fmt.Fprint(le.client.output, le.prompt)
-	fmt.Fprint(le.client.output, lines[0])
-	for i := 1; i < len(lines); i++ {
-		fmt.Fprint(le.client.output, "\n\r  ")
-		fmt.Fprint(le.client.output, lines[i])
-	}
-
-	// Draw completions inline (no extra lines) to avoid prompt duplication/scroll
+	// Compute completion lines for this cycle (vertical list)
+	newCompletionLines := 0
+	start, end := 0, 0
 	if le.completionsVisible && le.completionSelector != nil && le.completionSelector.IsVisible() {
 		items := le.completionSelector.items
-		maxItems := 6
-		start := 0
-		end := len(items)
+		maxItems := 8
+		end = len(items)
 		if maxItems > 0 && end > maxItems {
 			start = le.completionSelector.selectedIndex - maxItems/2
 			if start < 0 {
@@ -405,31 +395,66 @@ func (le *LineEditor) refreshDisplay() {
 				}
 			}
 		}
-		// Save cursor, move to end of first line, print suggestions, restore cursor
-		fmt.Fprint(le.client.output, "\033[s")
-		right := visibleLength(le.prompt) + len(lines[0]) + 1
-		if right < 1 {
-			right = 1
-		}
-		fmt.Fprint(le.client.output, "\r")
-		fmt.Fprintf(le.client.output, "\033[%dC", right)
-		// Build inline suggestions
-		inline := " Completions: "
-		for i := start; i < end; i++ {
-			if i > start {
-				inline += "  "
-			}
-			if i == le.completionSelector.selectedIndex {
-				inline += "▶ "
-			}
-			inline += items[i].Text
-		}
-		fmt.Fprint(le.client.output, inline)
-		fmt.Fprint(le.client.output, "\033[K") // clear residue to EOL
-		fmt.Fprint(le.client.output, "\033[u")
+		newCompletionLines = 1 + (end - start) // header + items
 	}
 
-	// Reposition cursor to current input line/column (inline menu uses no extra lines)
+	// Anchor to top-of-input (restore if exists, else move up by currentLineIndex)
+	if le.anchorSaved {
+		fmt.Fprint(le.client.output, "\033[u")
+	} else {
+		if currentLineIndex > 0 {
+			fmt.Fprintf(le.client.output, "\033[%dA", currentLineIndex)
+		}
+		fmt.Fprint(le.client.output, "\r")
+	}
+
+	// Clear exactly the area previously used (input + completions), or new total if larger
+	prevTotal := le.displayedLines + le.completionLines
+	newTotal := len(lines) + newCompletionLines
+	clearLines := prevTotal
+	if newTotal > clearLines {
+		clearLines = newTotal
+	}
+	if clearLines > 0 {
+		for i := 0; i < clearLines; i++ {
+			fmt.Fprint(le.client.output, "\033[K")
+			if i < clearLines-1 {
+				fmt.Fprint(le.client.output, "\033[1B\r")
+			}
+		}
+		if clearLines > 1 {
+			fmt.Fprintf(le.client.output, "\033[%dA\r", clearLines-1)
+		} else {
+			fmt.Fprint(le.client.output, "\r")
+		}
+	}
+
+	// Draw input
+	fmt.Fprint(le.client.output, le.prompt)
+	fmt.Fprint(le.client.output, lines[0])
+	for i := 1; i < len(lines); i++ {
+		fmt.Fprint(le.client.output, "\n\r  ")
+		fmt.Fprint(le.client.output, lines[i])
+	}
+
+	// Draw completions vertically below input when visible
+	if newCompletionLines > 0 {
+		items := le.completionSelector.items
+		fmt.Fprint(le.client.output, "\n\rCompletions:\n")
+		for i := start; i < end; i++ {
+			marker := "  "
+			if i == le.completionSelector.selectedIndex {
+				marker = "▶ "
+			}
+			fmt.Fprintf(le.client.output, "\r%s%s\n", marker, items[i].Text)
+		}
+	}
+
+	// Move cursor back to the input cursor position
+	moveUp := newCompletionLines + (len(lines) - 1 - currentLineIndex)
+	if moveUp > 0 {
+		fmt.Fprintf(le.client.output, "\033[%dA", moveUp)
+	}
 	fmt.Fprint(le.client.output, "\r")
 	if currentLineIndex > 0 {
 		fmt.Fprintf(le.client.output, "\033[%dB", currentLineIndex)
@@ -438,8 +463,19 @@ func (le *LineEditor) refreshDisplay() {
 		fmt.Fprintf(le.client.output, "\033[%dC", visibleLength(le.prompt)+currentColumn)
 	}
 
+	// Update counters
 	le.displayedLines = len(lines)
-	le.completionLines = 0
+	le.completionLines = newCompletionLines
+
+	// Save anchor at top-of-input for next refresh
+	if currentLineIndex > 0 {
+		fmt.Fprintf(le.client.output, "\033[%dA", currentLineIndex)
+	}
+	fmt.Fprint(le.client.output, "\r\033[s")
+	if currentLineIndex > 0 {
+		fmt.Fprintf(le.client.output, "\033[%dB", currentLineIndex)
+	}
+	le.anchorSaved = true
 }
 
 // (no-op) legacy completion updater removed; integrated rendering handles it
