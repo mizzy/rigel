@@ -385,11 +385,10 @@ func (le *LineEditor) refreshDisplay() {
 		fmt.Fprint(le.client.output, lines[i])
 	}
 
-	// Draw completions below input when visible
-	printedCompletionLines := 0
+	// Draw completions inline (no extra lines) to avoid prompt duplication/scroll
 	if le.completionsVisible && le.completionSelector != nil && le.completionSelector.IsVisible() {
 		items := le.completionSelector.items
-		maxItems := 8
+		maxItems := 6
 		start := 0
 		end := len(items)
 		if maxItems > 0 && end > maxItems {
@@ -406,25 +405,31 @@ func (le *LineEditor) refreshDisplay() {
 				}
 			}
 		}
-		// Header
-		fmt.Fprint(le.client.output, "\n\rCompletions:\n")
-		printedCompletionLines++ // header
-		// Items
-		for i := start; i < end; i++ {
-			marker := "  "
-			if i == le.completionSelector.selectedIndex {
-				marker = "▶ "
-			}
-			fmt.Fprintf(le.client.output, "\r%s%s\n", marker, items[i].Text)
-			printedCompletionLines++
+		// Save cursor, move to end of first line, print suggestions, restore cursor
+		fmt.Fprint(le.client.output, "\033[s")
+		right := visibleLength(le.prompt) + len(lines[0]) + 1
+		if right < 1 {
+			right = 1
 		}
+		fmt.Fprint(le.client.output, "\r")
+		fmt.Fprintf(le.client.output, "\033[%dC", right)
+		// Build inline suggestions
+		inline := " Completions: "
+		for i := start; i < end; i++ {
+			if i > start {
+				inline += "  "
+			}
+			if i == le.completionSelector.selectedIndex {
+				inline += "▶ "
+			}
+			inline += items[i].Text
+		}
+		fmt.Fprint(le.client.output, inline)
+		fmt.Fprint(le.client.output, "\033[K") // clear residue to EOL
+		fmt.Fprint(le.client.output, "\033[u")
 	}
 
-	// Reposition cursor to current input line/column
-	moveUp := printedCompletionLines + (len(lines) - 1 - currentLineIndex)
-	if moveUp > 0 {
-		fmt.Fprintf(le.client.output, "\033[%dA", moveUp)
-	}
+	// Reposition cursor to current input line/column (inline menu uses no extra lines)
 	fmt.Fprint(le.client.output, "\r")
 	if currentLineIndex > 0 {
 		fmt.Fprintf(le.client.output, "\033[%dB", currentLineIndex)
@@ -434,7 +439,7 @@ func (le *LineEditor) refreshDisplay() {
 	}
 
 	le.displayedLines = len(lines)
-	le.completionLines = printedCompletionLines
+	le.completionLines = 0
 }
 
 // (no-op) legacy completion updater removed; integrated rendering handles it
