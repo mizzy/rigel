@@ -371,8 +371,8 @@ func (le *LineEditor) refreshDisplay() {
 	currentLineIndex := len(linesBeforeCursor) - 1
 	currentColumn := len(linesBeforeCursor[len(linesBeforeCursor)-1])
 
-	// Move to the top of the previously drawn input block and clear it
-	n := le.displayedLines
+	// Move to the top of the previously drawn block (input + completions) and clear it
+	n := le.displayedLines + le.completionLines
 	if n > 0 {
 		if n > 1 {
 			fmt.Fprintf(le.client.output, "\033[%dA", n-1)
@@ -399,6 +399,41 @@ func (le *LineEditor) refreshDisplay() {
 		fmt.Fprint(le.client.output, lines[i])
 	}
 
+	// Draw completions below input when visible
+	printedCompletionLines := 0
+	if le.completionsVisible && le.completionSelector != nil && le.completionSelector.IsVisible() {
+		items := le.completionSelector.items
+		maxItems := 8
+		start := 0
+		end := len(items)
+		if maxItems > 0 && end > maxItems {
+			start = le.completionSelector.selectedIndex - maxItems/2
+			if start < 0 {
+				start = 0
+			}
+			end = start + maxItems
+			if end > len(items) {
+				end = len(items)
+				start = end - maxItems
+				if start < 0 {
+					start = 0
+				}
+			}
+		}
+		// Header
+		fmt.Fprint(le.client.output, "\n\rCompletions:\n")
+		printedCompletionLines++ // header
+		// Items
+		for i := start; i < end; i++ {
+			marker := "  "
+			if i == le.completionSelector.selectedIndex {
+				marker = "▶ "
+			}
+			fmt.Fprintf(le.client.output, "\r%s%s\n", marker, items[i].Text)
+			printedCompletionLines++
+		}
+	}
+
 	// Position cursor
 	if len(lines) > 1 {
 		fmt.Fprintf(le.client.output, "\033[%dA", len(lines)-1)
@@ -412,6 +447,7 @@ func (le *LineEditor) refreshDisplay() {
 	}
 
 	le.displayedLines = len(lines)
+	le.completionLines = printedCompletionLines
 }
 
 // showOrUpdateCompletions renders the current completion list below the input while preserving cursor
