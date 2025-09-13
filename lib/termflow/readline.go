@@ -433,13 +433,19 @@ func (le *LineEditor) showOrUpdateCompletions() {
 	if down > 0 {
 		fmt.Fprintf(le.client.output, "\033[%dB", down)
 	}
+	// Move exactly one line below the input start and return to column 0
+	fmt.Fprint(le.client.output, "\033[1B\r")
 
-	// Move to next line and render completions
-	fmt.Fprint(le.client.output, "\n\r")
-	block := le.completionSelector.RenderCompletions(8)
-	fmt.Fprint(le.client.output, "\r")
-	fmt.Fprint(le.client.output, block)
-	le.completionLines = strings.Count(block, "\n")
+	// Render completions without trailing blank line
+	raw := le.completionSelector.RenderCompletions(8)
+	block := strings.TrimRight(raw, "\n")
+	if block != "" {
+		fmt.Fprint(le.client.output, block)
+		// Count visual lines (lines = number of '\n' + 1)
+		le.completionLines = strings.Count(block, "\n") + 1
+	} else {
+		le.completionLines = 0
+	}
 
 	// Restore cursor position
 	fmt.Fprint(le.client.output, "\0338")
@@ -453,7 +459,7 @@ func (le *LineEditor) clearCompletions() {
 	// Save cursor
 	fmt.Fprint(le.client.output, "\0337")
 
-	// Move to the bottom of the input block
+	// Move to the bottom of the input block and down to the first completion line
 	lines := strings.Split(le.line, "\n")
 	textBeforeCursor := le.line[:le.cursor]
 	linesBeforeCursor := strings.Split(textBeforeCursor, "\n")
@@ -462,12 +468,13 @@ func (le *LineEditor) clearCompletions() {
 	if down > 0 {
 		fmt.Fprintf(le.client.output, "\033[%dB", down)
 	}
-	// Move to the first line of completions (line after input)
-	fmt.Fprint(le.client.output, "\n\r")
+	fmt.Fprint(le.client.output, "\033[1B\r")
+
+	// Clear exactly the number of lines previously drawn
 	for i := 0; i < le.completionLines; i++ {
-		fmt.Fprint(le.client.output, "\r\033[K")
+		fmt.Fprint(le.client.output, "\033[K")
 		if i < le.completionLines-1 {
-			fmt.Fprint(le.client.output, "\n")
+			fmt.Fprint(le.client.output, "\n\r")
 		}
 	}
 
