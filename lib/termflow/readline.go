@@ -416,10 +416,8 @@ func (le *LineEditor) refreshDisplay() {
 
 // showOrUpdateCompletions renders the current completion list below the input while preserving cursor
 func (le *LineEditor) showOrUpdateCompletions() {
-	// Clear previous list if present
-	if le.completionLines > 0 {
-		le.clearCompletions()
-	}
+	// Aggressively clear any prior completion area to avoid duplicates/blank lines
+	le.clearCompletionArea(24)
 
 	// Save cursor position
 	fmt.Fprint(le.client.output, "\0337")
@@ -456,10 +454,20 @@ func (le *LineEditor) clearCompletions() {
 	if le.completionLines <= 0 {
 		return
 	}
+	le.clearCompletionArea(le.completionLines)
+	le.completionLines = 0
+}
+
+// clearCompletionArea clears up to maxLines below the input block, starting one line beneath it
+// This is more robust against earlier versions that may have left stray blank lines.
+func (le *LineEditor) clearCompletionArea(maxLines int) {
+	if maxLines <= 0 {
+		maxLines = 1
+	}
 	// Save cursor
 	fmt.Fprint(le.client.output, "\0337")
 
-	// Move to the bottom of the input block and down to the first completion line
+	// Move to the bottom of the input block
 	lines := strings.Split(le.line, "\n")
 	textBeforeCursor := le.line[:le.cursor]
 	linesBeforeCursor := strings.Split(textBeforeCursor, "\n")
@@ -468,19 +476,19 @@ func (le *LineEditor) clearCompletions() {
 	if down > 0 {
 		fmt.Fprintf(le.client.output, "\033[%dB", down)
 	}
+	// Move to first completion line
 	fmt.Fprint(le.client.output, "\033[1B\r")
 
-	// Clear exactly the number of lines previously drawn
-	for i := 0; i < le.completionLines; i++ {
+	// Clear requested number of lines
+	for i := 0; i < maxLines; i++ {
 		fmt.Fprint(le.client.output, "\033[K")
-		if i < le.completionLines-1 {
+		if i < maxLines-1 {
 			fmt.Fprint(le.client.output, "\n\r")
 		}
 	}
 
 	// Restore cursor
 	fmt.Fprint(le.client.output, "\0338")
-	le.completionLines = 0
 }
 
 // hideCompletionsIfVisible clears and hides the completion list if shown
