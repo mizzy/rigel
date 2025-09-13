@@ -157,7 +157,8 @@ func (cs *CompletionSelector) RenderCompletions(maxItems int) string {
 	}
 
 	var result strings.Builder
-	result.WriteString("\nCompletions:\n")
+	// Ensure each printed line returns to column 0 with \r
+	result.WriteString("\rCompletions:\n")
 
 	start := 0
 	end := len(cs.items)
@@ -185,6 +186,7 @@ func (cs *CompletionSelector) RenderCompletions(maxItems int) string {
 			marker = "▶ "
 		}
 
+		result.WriteString("\r")
 		result.WriteString(marker)
 		result.WriteString(item.Text)
 
