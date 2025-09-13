@@ -371,25 +371,11 @@ func (le *LineEditor) refreshDisplay() {
 	currentLineIndex := len(linesBeforeCursor) - 1
 	currentColumn := len(linesBeforeCursor[len(linesBeforeCursor)-1])
 
-	// Move to the top of the previously drawn block (input + completions) and clear it
-	n := le.displayedLines + le.completionLines
-	if n > 0 {
-		if n > 1 {
-			fmt.Fprintf(le.client.output, "\033[%dA", n-1)
-		}
-		fmt.Fprint(le.client.output, "\r")
-		for i := 0; i < n; i++ {
-			fmt.Fprint(le.client.output, "\033[K")
-			if i < n-1 {
-				fmt.Fprint(le.client.output, "\033[1B\r")
-			}
-		}
-		if n > 1 {
-			fmt.Fprintf(le.client.output, "\033[%dA\r", n-1)
-		} else {
-			fmt.Fprint(le.client.output, "\r")
-		}
+	// Move to the first input line from current cursor, then clear to end-of-screen
+	if currentLineIndex > 0 {
+		fmt.Fprintf(le.client.output, "\033[%dA", currentLineIndex)
 	}
+	fmt.Fprint(le.client.output, "\r\033[J")
 
 	// Draw fresh content (no leading newline; spacer is provided by welcome)
 	fmt.Fprint(le.client.output, le.prompt)
@@ -434,9 +420,10 @@ func (le *LineEditor) refreshDisplay() {
 		}
 	}
 
-	// Position cursor
-	if len(lines) > 1 {
-		fmt.Fprintf(le.client.output, "\033[%dA", len(lines)-1)
+	// Reposition cursor to current input line/column
+	moveUp := printedCompletionLines + (len(lines) - 1 - currentLineIndex)
+	if moveUp > 0 {
+		fmt.Fprintf(le.client.output, "\033[%dA", moveUp)
 	}
 	fmt.Fprint(le.client.output, "\r")
 	if currentLineIndex > 0 {
