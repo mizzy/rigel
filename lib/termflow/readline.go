@@ -419,8 +419,8 @@ func (le *LineEditor) showOrUpdateCompletions() {
 	// Clear exactly the previously drawn completion block to avoid duplication/scroll
 	le.clearCompletions()
 
-	// Save cursor position
-	fmt.Fprint(le.client.output, "\0337")
+	// Save cursor position (CSI s for compatibility)
+	fmt.Fprint(le.client.output, "\033[s")
 
 	// Move to the bottom of the input block
 	lines := strings.Split(le.line, "\n")
@@ -434,6 +434,9 @@ func (le *LineEditor) showOrUpdateCompletions() {
 	// Move exactly one line below the input start and return to column 0
 	fmt.Fprint(le.client.output, "\033[1B\r")
 
+	// Clear from cursor to end of screen to remove any prior completion remnants
+	fmt.Fprint(le.client.output, "\033[J")
+
 	// Render completions without trailing blank line
 	raw := le.completionSelector.RenderCompletions(8)
 	block := strings.TrimRight(raw, "\n")
@@ -445,8 +448,8 @@ func (le *LineEditor) showOrUpdateCompletions() {
 		le.completionLines = 0
 	}
 
-	// Restore cursor position
-	fmt.Fprint(le.client.output, "\0338")
+	// Restore cursor position (CSI u)
+	fmt.Fprint(le.client.output, "\033[u")
 }
 
 // clearCompletions clears the completion block below the input
@@ -464,8 +467,8 @@ func (le *LineEditor) clearCompletionArea(maxLines int) {
 	if maxLines <= 0 {
 		maxLines = 1
 	}
-	// Save cursor
-	fmt.Fprint(le.client.output, "\0337")
+	// Save cursor (CSI s)
+	fmt.Fprint(le.client.output, "\033[s")
 
 	// Move to the bottom of the input block
 	lines := strings.Split(le.line, "\n")
@@ -476,19 +479,11 @@ func (le *LineEditor) clearCompletionArea(maxLines int) {
 	if down > 0 {
 		fmt.Fprintf(le.client.output, "\033[%dB", down)
 	}
-	// Move to first completion line
-	fmt.Fprint(le.client.output, "\033[1B\r")
+	// Move to first completion line and clear to end of screen
+	fmt.Fprint(le.client.output, "\033[1B\r\033[J")
 
-	// Clear requested number of lines without introducing newlines
-	for i := 0; i < maxLines; i++ {
-		fmt.Fprint(le.client.output, "\r\033[K")
-		if i < maxLines-1 {
-			fmt.Fprint(le.client.output, "\033[1B")
-		}
-	}
-
-	// Restore cursor
-	fmt.Fprint(le.client.output, "\0338")
+	// Restore cursor (CSI u)
+	fmt.Fprint(le.client.output, "\033[u")
 }
 
 // hideCompletionsIfVisible clears and hides the completion list if shown
